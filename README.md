@@ -16,12 +16,16 @@ Three rows, which form a simplified business stack:
 - People / operations
 - Partners / technology
 
-## Modes
+## Using the board
 
-1. **Collect**: add topics (ideas, opportunities, questions) and sources (facts with a reference) directly into cells.
-2. **Cluster**: drag one card onto another to stack them into a named theme, or drag a card onto an existing stack to add it.
-3. **Connect**: drag from one stack's handle to another stack to start a thread across horizons and layers.
-4. **Story**: the finished board with a written narrative, insights, and a check for structural gaps.
+Everything happens on the board itself:
+
+- **Add**: select **+ Add card** in any cell to add a topic (an idea, opportunity or question) or a source (a fact with a reference). Press Enter to keep adding.
+- **Cluster**: drag a card onto another card to stack them into a named theme, or onto an existing stack to add it. Select a stack to rename it or drag cards back out.
+- **Connect**: drag the orange handle on a stack (it appears on hover) to another stack to start a thread. Drag from the last stack in a thread to extend it.
+- **Move**: drag a card or stack to empty space in another cell.
+
+A separate **Story** view shows the finished board with a written narrative, insights, and a check for structural gaps.
 
 Board settings let you rename the horizons and layers. Every action can be undone.
 

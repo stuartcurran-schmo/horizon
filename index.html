@@ -148,6 +148,11 @@ body.dragging svg.threads .hit{pointer-events:none}
 .tile.lifting{opacity:.25}
 .handle{position:absolute;right:-9px;top:50%;width:18px;height:18px;margin-top:-9px;border-radius:50%;background:var(--hl);border:3px solid var(--surface);cursor:crosshair;touch-action:none;z-index:3;box-shadow:0 0 0 1px var(--hl)}
 .handle:hover{transform:scale(1.15)}
+.handle{opacity:0;transition:opacity .15s}
+.tile:hover .handle,.tile:focus-visible .handle,body.linking .handle{opacity:1}
+@media (hover:none){.handle{opacity:1}}
+.gest{display:flex;flex-wrap:wrap;gap:4px 18px}
+.gest .hd{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--hl);vertical-align:-1px}
 .dragghost{position:fixed;z-index:100;pointer-events:none;margin:0;transform:rotate(-2.5deg) scale(1.05);box-shadow:0 14px 30px color-mix(in srgb,var(--ink) 25%,transparent) !important;opacity:.95}
 svg.live{position:fixed;inset:0;z-index:90;pointer-events:none;width:100vw;height:100vh}
 
@@ -251,11 +256,9 @@ aside.side{display:grid;gap:18px}
     <div class="board-pick">
       <select id="boardSel" aria-label="Choose a board"></select>
     </div>
-    <nav class="modes" id="modes" aria-label="Board mode">
-      <a href="#collect" data-v="collect"><span class="n">1</span>Collect</a>
-      <a href="#cluster" data-v="cluster"><span class="n">2</span>Cluster</a>
-      <a href="#connect" data-v="connect"><span class="n">3</span>Connect</a>
-      <a href="#story" data-v="story"><span class="n">4</span>Story</a>
+    <nav class="modes" id="modes" aria-label="View">
+      <a href="#board" data-v="board">Board</a>
+      <a href="#story" data-v="story">Story</a>
     </nav>
     <span class="spacer"></span>
     <span class="status" id="status" aria-live="polite"></span>
@@ -284,7 +287,7 @@ aside.side{display:grid;gap:18px}
 const COLS=["H1","H2","H3"];
 const ROWS=["customer","people","partners"];
 const TC=["var(--t1)","var(--t2)","var(--t3)","var(--t4)","var(--t5)","var(--t6)"];
-const MODES=["collect","cluster","connect","story"];
+const MODES=["board","story"];
 
 const uid=p=>p+Math.random().toString(36).slice(2,9);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -373,7 +376,7 @@ function exampleBoard(){
 /* ---------- State ---------- */
 let board=exampleBoard();
 let boards=[];
-const ui={mode:"collect",sel:null,folder:null,naming:false,edit:null,settings:false,pop:null,compose:null,busy:null,confirmDel:false,dialog:null};
+const ui={mode:"board",sel:null,folder:null,naming:false,edit:null,settings:false,pop:null,compose:null,busy:null,confirmDel:false,dialog:null};
 const caps={db:null,user:null,sample:null,downloads:null,uid:null};
 let hist=[];
 
@@ -477,9 +480,6 @@ function dropItem(itemId,tgt){
   const it=itemById(itemId);if(!it||!tgt)return;
   let [k,v]=tgt.split(/:(.*)/s);
   const cur=themeOfItem(itemId);
-  if(ui.mode==="collect"&&k!=="cell"){
-    const o=k==="item"?itemById(v):themeById(v);if(!o)return;k="cell";v=o.col+"|"+o.row;
-  }
   if(k==="cell"){
     const [c,r]=v.split("|");
     if(it.col===c&&it.row===r&&!cur)return;
@@ -504,7 +504,6 @@ function dropItem(itemId,tgt){
 function dropTheme(themeId,tgt){
   const th=themeById(themeId);if(!th||!tgt)return;
   let [k,v]=tgt.split(/:(.*)/s);
-  if(ui.mode==="collect"&&k!=="cell"){const o=k==="item"?itemById(v):themeById(v);if(!o)return;k="cell";v=o.col+"|"+o.row}
   if(k==="cell"){
     const [c,r]=v.split("|");if(th.col===c&&th.row===r)return;
     snap();th.col=c;th.row=r;th.itemIds.forEach(id=>moveItemTo(itemById(id),c,r));touch();render();return;
@@ -759,10 +758,8 @@ function draftFromStructure(){
 
 /* ---------- Rendering ---------- */
 const HINTS={
-  collect:"<b>Collect.</b> Select + in any cell to add a topic or source. Drag a card to move it to another cell. Select a card to edit it.",
-  cluster:"<b>Cluster.</b> Drag a card onto another card to stack them into a theme. Drag onto a stack to add to it. Select a stack to rename it or take cards out.",
-  connect:"<b>Connect.</b> Drag from the orange handle on one stack to another to start a thread. Drag from the last stack of a thread to extend it. Select a line or a thread below to edit it.",
-  story:"<b>Story.</b> The finished blueprint and its narrative. Select a thread to focus it. Everything in the narrative is editable."
+  board:`<span><b>+</b> add a card</span><span><b>Drag card onto card</b> to stack a theme</span><span><b>Drag the <i class="hd" aria-hidden="true"></i> handle</b> to another stack to thread</span><span><b>Select</b> to edit or open</span>`,
+  story:"<span><b>Story.</b> The finished blueprint and its narrative. Select a thread to focus it. Everything in the narrative is editable.</span>"
 };
 function claudeBtn(act,label,key){
   if(!caps.sample)return"";
@@ -771,17 +768,16 @@ function claudeBtn(act,label,key){
 function render(){
   document.querySelectorAll("#modes a").forEach(a=>{if(a.dataset.v===ui.mode)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
   let acts="";
-  if(ui.mode==="cluster")acts=claudeBtn("autoCluster","Auto-cluster","cluster");
-  if(ui.mode==="connect")acts=claudeBtn("autoConnect","Auto-connect","connect");
-  if(!caps.sample&&!inClaude&&(ui.mode==="cluster"||ui.mode==="connect"||ui.mode==="story"))acts=`<button class="btn sm" type="button" data-act="openKey">Turn on Claude features</button>`;
-  $("#hint").innerHTML=`<span>${HINTS[ui.mode]}</span><span class="acts">${acts}</span>`;
+  if(ui.mode==="board")acts=claudeBtn("autoCluster","Auto-cluster","cluster")+claudeBtn("autoConnect","Auto-connect","connect");
+  if(!caps.sample&&!inClaude)acts=`<button class="btn sm" type="button" data-act="openKey">Turn on Claude features</button>`;
+  $("#hint").innerHTML=`<span class="gest">${HINTS[ui.mode]}</span><span class="acts">${acts}</span>`;
   document.body.classList.toggle("dragmode",ui.mode!=="story");
   const s=board.items.filter(i=>i.kind==="source").length;
   const head=`${board.isExample?`<div class="notice">This is a worked example. Change anything and it becomes your own copy; the original stays in the board list.</div>`:""}
   <div class="bp-head"><div><span class="eyebrow">Horizon Blueprint</span><h1>${esc(board.title)}</h1>${board.purpose?`<p>${esc(board.purpose)}</p>`:`<p><button class="btn sm" type="button" data-act="openSettings">Add the question this board answers</button></p>`}</div>
     <div class="stats"><div><b>${board.items.length}</b>cards</div><div><b>${s}</b>sources</div><div><b>${board.themes.length}</b>themes</div><div><b>${board.threads.length}</b>threads</div></div></div>`;
   $("#view").innerHTML=head+`<div class="board-scroll"><div class="board" id="board"><svg class="threads" aria-hidden="true"></svg>${boardHTML()}</div></div>`+threadBar()+(ui.mode==="story"?storyHTML():"");
-  if(ui.mode==="connect"||ui.mode==="story")requestAnimationFrame(drawThreads);
+  requestAnimationFrame(drawThreads);
   renderLayer();updUndo();
   if(ui.compose){const t=$("#cmp-text");if(t&&document.activeElement!==t&&ui.compose.focus){t.focus();ui.compose.focus=false}}
 }
@@ -798,27 +794,27 @@ function boardHTML(){
       const sel=ui.sel&&threadById(ui.sel);
       let tiles=ths.map(t=>{
         const tr=threadsOfTheme(t.id);const e=evidence([t.id]);
-        const dim=(M==="connect"||M==="story")&&sel&&!sel.themeIds.includes(t.id);
-        const dots=(M==="connect"||M==="story")?`<span class="dots">${tr.map(x=>`<span class="dot" style="--tc:${threadColor(x)}">${board.threads.indexOf(x)+1}</span>`).join("")}</span>`:"";
+        const dim=sel&&!sel.themeIds.includes(t.id);
+        const dots=`<span class="dots">${tr.map(x=>`<span class="dot" style="--tc:${threadColor(x)}">${board.threads.indexOf(x)+1}</span>`).join("")}</span>`;
         const drag=M!=="story"?` data-drag="theme:${t.id}" data-drop="theme:${t.id}"`:"";
         return `<div class="tile stack${dim?" dim":""}" role="button" tabindex="0"${drag} data-node="${t.id}" data-act="openFolder" data-id="${t.id}" aria-label="Theme ${esc(t.name||"unnamed")}, ${t.itemIds.length} cards">
           <div class="nm">${esc(t.name||"Unnamed theme")}</div>
           <div class="pv">${t.itemIds.slice(0,3).map(id=>{const i=itemById(id);return i?`<span>${esc(i.text)}</span>`:""}).join("")}</div>
           <div class="mt"><span>${t.itemIds.length} card${t.itemIds.length>1?"s":""}${e.s?` · ${e.s} src`:""}</span>${dots}</div>
-          ${M==="connect"?`<span class="handle" data-drag="link:theme:${t.id}" title="Drag to another stack to connect" aria-hidden="true"></span>`:""}
+          ${M==="board"?`<span class="handle" data-drag="link:theme:${t.id}" title="Drag to another stack to connect" aria-hidden="true"></span>`:""}
         </div>`;
       }).join("");
       tiles+=loose.map(i=>{
         const drag=M!=="story"?` data-drag="item:${i.id}" data-drop="item:${i.id}"`:"";
-        const muted=(M==="connect"||M==="story")?" muted":"";
-        return `<div class="tile card ${i.kind}${muted}" role="button" tabindex="0"${drag} data-act="editItem" data-id="${i.id}">${i.kind==="source"?`<span class="k">Source</span><br>`:""}${esc(i.text)}${i.ref?`<span class="ref">${esc(i.ref)}</span>`:""}${M==="connect"?`<span class="handle" data-drag="link:item:${i.id}" title="Drag to a stack to connect" aria-hidden="true"></span>`:""}</div>`;
+        const muted=M==="story"?" muted":"";
+        return `<div class="tile card ${i.kind}${muted}" role="button" tabindex="0"${drag} data-act="editItem" data-id="${i.id}">${i.kind==="source"?`<span class="k">Source</span><br>`:""}${esc(i.text)}${i.ref?`<span class="ref">${esc(i.ref)}</span>`:""}${M==="board"?`<span class="handle" data-drag="link:item:${i.id}" title="Drag to a stack to connect" aria-hidden="true"></span>`:""}</div>`;
       }).join("");
       let foot="";
-      if(M==="collect"){
+      if(M==="board"){
         if(ui.compose&&ui.compose.cell===key)foot=composerHTML();
         else foot=`<button class="addbtn" type="button" data-act="compose" data-k="${key}">+ Add card</button>`;
       }
-      const empty=!ths.length&&!loose.length&&M!=="collect"?`<span class="cell-empty">empty</span>`:"";
+      const empty=!ths.length&&!loose.length&&M==="story"?`<span class="cell-empty">empty</span>`:"";
       h+=`<div class="mc ${c}${last}" data-drop="cell:${key}">${tiles?`<div class="tiles">${tiles}</div>`:""}${empty}${foot}</div>`;
     });
   });
@@ -835,11 +831,10 @@ function composerHTML(){
   </div>`;
 }
 function threadBar(){
-  if(ui.mode!=="connect"&&ui.mode!=="story")return"";
-  if(!board.threads.length)return ui.mode==="connect"?`<div class="tbar"><span class="help" style="margin:0">No threads yet. Drag from a handle to another stack to start one.</span></div>`:"";
+  if(!board.threads.length)return ui.mode==="board"?`<div class="tbar"><span class="help" style="margin:0">No threads yet. Drag from a handle to another stack to start one.</span></div>`:"";
   let h=`<div class="tbar" role="group" aria-label="Threads">${board.threads.map((th,ix)=>`<button type="button" class="lg${ui.sel===th.id?" on":ui.sel?" off":""}" style="--tc:${threadColor(th)}" data-act="selThread" data-id="${th.id}" aria-pressed="${ui.sel===th.id}"><span class="badge">${ix+1}</span>${esc(th.name||"Unnamed thread")}</button>`).join("")}`;
   const th=ui.sel&&threadById(ui.sel);
-  if(th&&ui.mode==="connect"){
+  if(th&&ui.mode==="board"){
     h+=`<div class="tedit" style="--tc:${threadColor(th)}">
       <div class="row"><span class="badge">${board.threads.indexOf(th)+1}</span><label class="sr" for="ten">Thread name</label><input type="text" id="ten" data-bind="thread.${th.id}.name" value="${esc(th.name)}" placeholder="Name this thread"><button class="btn sm ghost danger" type="button" data-act="delThread" data-id="${th.id}">Delete thread</button><button class="btn sm" type="button" data-act="selThread" data-id="${th.id}">Close</button></div>
       <div class="seq">${th.themeIds.map((id,k)=>{const t=themeById(id);if(!t)return"";return `${k?'<span class="ar" aria-hidden="true">→</span>':""}<span class="step"><span><span class="c">${t.col} · ${esc(short(t.row))}</span><br>${esc(t.name||"Unnamed theme")}</span><button type="button" data-act="mv" data-th="${th.id}" data-k="${k}" data-d="-1" aria-label="Move earlier"${k===0?" disabled":""}>←</button><button type="button" data-act="mv" data-th="${th.id}" data-k="${k}" data-d="1" aria-label="Move later"${k===th.themeIds.length-1?" disabled":""}>→</button><button type="button" data-act="rmStep" data-th="${th.id}" data-k="${k}" aria-label="Remove from thread">✕</button></span>`}).join("")}</div>
@@ -876,7 +871,7 @@ function storyHTML(){
   </div>`;
 }
 function drawThreads(){
-  const m=document.getElementById("board");if(!m||(ui.mode!=="connect"&&ui.mode!=="story"))return;
+  const m=document.getElementById("board");if(!m)return;
   const svg=m.querySelector("svg.threads");const mb=m.getBoundingClientRect();
   svg.setAttribute("width",m.offsetWidth);svg.setAttribute("height",m.offsetHeight);svg.setAttribute("viewBox",`0 0 ${m.offsetWidth} ${m.offsetHeight}`);
   const pt={};
@@ -1020,7 +1015,7 @@ function validTarget(spec){
   return true;
 }
 function startDrag(e){
-  drag.started=true;document.body.classList.add("dragging");
+  drag.started=true;document.body.classList.add("dragging");if(drag.spec.startsWith("link:"))document.body.classList.add("linking");
   if(drag.spec.startsWith("link:")){
     drag.link=true;
     const r=drag.el.getBoundingClientRect();
@@ -1043,7 +1038,7 @@ function endDrag(e,cancel){
   if(!drag)return;
   const d=drag;drag=null;
   if(!d.started)return;
-  document.body.classList.remove("dragging");
+  document.body.classList.remove("dragging","linking");
   suppressClick=true;setTimeout(()=>suppressClick=false,0);
   if(d.ghost)d.ghost.remove();if(d.svg)d.svg.remove();
   if(d.tEl)d.tEl.classList.remove("drop-on");
@@ -1114,7 +1109,7 @@ const A={
   },
   removeKey(){setKey("");if(!inClaude)caps.sample=null;render();toast("API key removed from this browser.")},
   openSettings(){closeMenu();ui.settings=true;renderLayer();const t=$("#s-title");t&&t.focus()},
-  newBoard(){closeMenu();board=blankBoard();hist=[];ui.sel=null;ui.compose=null;touch(true);location.hash="collect";render();ui.settings=true;renderLayer();const t=$("#s-title");t&&(t.focus(),t.select())},
+  newBoard(){closeMenu();board=blankBoard();hist=[];ui.sel=null;ui.compose=null;touch(true);location.hash="board";render();ui.settings=true;renderLayer();const t=$("#s-title");t&&(t.focus(),t.select())},
   exportMd(){closeMenu();offer(slug()+".md",toMarkdown(),"Narrative as Markdown")},
   exportJson(){closeMenu();offer(slug()+".json",toJSON(),"Board data as JSON")},
   importJson(){closeMenu();$("#importFile").click()},
@@ -1217,7 +1212,7 @@ async function switchBoard(id){
   setStatus(board.isExample?"":(usingDb()?"Saved":"Saved in this browser only"),!board.isExample&&!usingDb());
   renderPicker();render();
 }
-function route(){const h=location.hash.replace("#","");ui.mode=MODES.includes(h)?h:"collect";ui.pop=null;if(ui.mode!=="collect")ui.compose=null;render()}
+function route(){const h=location.hash.replace("#","");ui.mode=h==="story"?"story":"board";ui.pop=null;if(ui.mode==="story")ui.compose=null;render()}
 window.addEventListener("hashchange",route);
 if("ResizeObserver" in window)new ResizeObserver(()=>requestAnimationFrame(drawThreads)).observe(document.body);
 else window.addEventListener("resize",drawThreads);

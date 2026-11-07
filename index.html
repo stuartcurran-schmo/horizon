@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Horizon Blueprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: the board is the interface. A slim toolbar picks the mode (Collect, Cluster,
+   Connect, Story); the 3x3 matrix fills the page. Columns thin out (solid, dotted, hatched)
+   as certainty falls toward H3. Cards stack like folders; threads run underneath the stacks. */
+:root{
+  --bg:#f2f3f0;
+  --surface:#ffffff;
+  --ink:#16222e;
+  --muted:#5a6672;
+  --line:#d4d9d8;
+  --accent:#1d4466;
+  --accent-soft:#e3ebf2;
+  --hl:#c8470f;
+  --good:#2f7a4f;
+  --warn:#9a6a00;
+  --t1:#c8470f; --t2:#0b7a75; --t3:#6d45ad; --t4:#a87d00; --t5:#b5245c; --t6:#2b67a8;
+  --display:"Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --read:"Newsreader", Georgia, "Times New Roman", serif;
+  --r:8px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f151b; --surface:#16202a; --ink:#e4eaef; --muted:#97a4b0; --line:#2a3642;
+    --accent:#8db4dc; --accent-soft:#1c2c3c; --hl:#ff7c48; --good:#5fbf86; --warn:#e0b44a;
+    --t1:#ff7c48; --t2:#3cc4bc; --t3:#a888e6; --t4:#e2bb3d; --t5:#f0679b; --t6:#6aa6e8;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f151b; --surface:#16202a; --ink:#e4eaef; --muted:#97a4b0; --line:#2a3642;
+  --accent:#8db4dc; --accent-soft:#1c2c3c; --hl:#ff7c48; --good:#5fbf86; --warn:#e0b44a;
+  --t1:#ff7c48; --t2:#3cc4bc; --t3:#a888e6; --t4:#e2bb3d; --t5:#f0679b; --t6:#6aa6e8;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
+
+/* Toolbar */
+.top{position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--line)}
+.top-inner{max-width:1480px;margin:0 auto;padding:8px 16px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.mark{font-family:var(--display);font-stretch:125%;font-weight:800;font-size:13px;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.board-pick{display:flex;gap:6px;align-items:center;min-width:0;flex:0 1 300px}
+.board-pick select{min-width:0;flex:1}
+.modes{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:3px;gap:2px}
+.modes a{display:flex;align-items:baseline;gap:6px;padding:5px 12px;border-radius:5px;text-decoration:none;color:var(--muted);font-weight:500;font-size:14px;white-space:nowrap}
+.modes a .n{font-family:var(--mono);font-size:10.5px}
+.modes a:hover{color:var(--ink)}
+.modes a[aria-current="page"]{background:var(--accent);color:var(--surface)}
+.spacer{flex:1}
+.status{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.status.warn{color:var(--warn)}
+.tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+details.menu{position:relative}
+details.menu summary{list-style:none}
+details.menu summary::-webkit-details-marker{display:none}
+details.menu .mlist{position:absolute;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px;display:grid;min-width:190px;z-index:40;box-shadow:0 8px 24px color-mix(in srgb,var(--ink) 14%,transparent)}
+details.menu .mlist button{text-align:left;border:0;background:transparent;padding:7px 10px;border-radius:5px;cursor:pointer;font-size:14px}
+details.menu .mlist button:hover{background:var(--accent-soft)}
+.hint{max-width:1480px;margin:0 auto;padding:7px 16px 9px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13.5px;color:var(--muted)}
+.hint b{color:var(--ink);font-weight:600}
+.hint .acts{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+
+/* Controls */
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:5px 11px;font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.btn.claude{border-color:var(--hl);color:var(--hl)}
+.btn.claude:hover{background:color-mix(in srgb,var(--hl) 8%,var(--surface))}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--ink);border-color:var(--line)}
+.btn.danger{color:var(--hl)}
+.btn[disabled]{opacity:.45;cursor:default}
+.btn.sm{padding:3px 8px;font-size:12.5px}
+.btn.icon{padding:5px 8px}
+input[type=text],textarea,select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%}
+select{width:auto;padding:5px 8px}
+textarea{resize:vertical;min-height:60px}
+input[type=text]:focus,textarea:focus,select:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+label.lbl{display:block;font-weight:600;font-size:13px;margin-bottom:4px}
+.help{color:var(--muted);font-size:13px;margin:2px 0 8px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.spin{width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+main{max-width:1480px;margin:0 auto;padding:14px 16px 80px}
+.bp-head{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px}
+.bp-head h1{font-size:clamp(22px,2.6vw,32px);font-stretch:115%;font-weight:750;letter-spacing:-.01em}
+.bp-head p{margin:4px 0 0;color:var(--muted);max-width:70ch;font-size:14.5px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--hl)}
+.stats{display:flex;gap:16px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.stats b{display:block;font-family:var(--display);font-stretch:120%;font-size:20px;color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+.notice{border-left:3px solid var(--hl);background:var(--surface);padding:8px 14px;border-radius:0 6px 6px 0;margin-bottom:12px;font-size:13.5px}
+
+/* Board */
+.board-scroll{overflow-x:auto;margin:0 -16px;padding:0 16px 8px}
+.board{position:relative;min-width:980px;display:grid;grid-template-columns:104px repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.board .colh{padding:10px 14px 8px;border-bottom:1px solid var(--line);border-left:1px solid var(--line)}
+.board .colh .k{font-family:var(--display);font-stretch:125%;font-weight:800;font-size:22px;line-height:1;color:var(--accent)}
+.board .colh .l{font-weight:600;font-size:13px;margin-top:3px}
+.board .colh .p{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.board .corner{border-bottom:1px solid var(--line);padding:10px;font-family:var(--mono);font-size:10.5px;color:var(--muted);display:flex;align-items:flex-end}
+.board .rowh{padding:12px 10px;border-bottom:1px solid var(--line);font-weight:600;font-size:13px;line-height:1.25;display:flex;flex-direction:column;gap:3px}
+.board .rowh .ix{font-family:var(--mono);font-size:10.5px;color:var(--muted);font-weight:400}
+.board .last{border-bottom:0}
+.mc{border-left:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 12px 12px;min-height:170px;display:flex;flex-direction:column;gap:10px;transition:background-color .15s}
+.mc.H2{background-image:radial-gradient(color-mix(in srgb,var(--muted) 22%,transparent) 1px,transparent 1.2px);background-size:9px 9px}
+.mc.H3{background-image:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 13%,transparent) 0 1px,transparent 1px 8px)}
+.mc.drop-on{background-color:color-mix(in srgb,var(--hl) 9%,transparent);box-shadow:inset 0 0 0 2px var(--hl)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px 12px;align-content:start}
+svg.threads{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:visible}
+svg.threads .hit{pointer-events:stroke;cursor:pointer}
+body.dragging svg.threads .hit{pointer-events:none}
+
+.tile{position:relative;z-index:2;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-size:13px;line-height:1.3;cursor:pointer;user-select:none;-webkit-user-select:none;transition:opacity .2s,transform .12s,box-shadow .12s;text-align:left}
+.tile:hover{border-color:var(--muted)}
+.dragmode .tile{touch-action:none}
+.card{border-left:3px solid var(--accent-soft)}
+.card.source{border-left-color:var(--good)}
+.card .ref{display:block;font-family:var(--mono);font-size:10px;color:var(--good);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .k{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--good)}
+.stack{background:color-mix(in srgb,var(--accent-soft) 70%,var(--surface));border-color:color-mix(in srgb,var(--accent) 45%,var(--line));margin:0 7px 7px 0;
+  box-shadow:3px 3px 0 -1px var(--surface),3px 3px 0 0 color-mix(in srgb,var(--accent) 35%,var(--line)),7px 7px 0 -1px var(--surface),7px 7px 0 0 color-mix(in srgb,var(--accent) 25%,var(--line))}
+.stack .nm{font-weight:600;font-size:13.5px;line-height:1.25}
+.stack .pv{display:grid;gap:1px;margin:4px 0 5px;font-size:11.5px;color:var(--muted)}
+.stack .pv span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stack .mt{display:flex;gap:6px;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.dots{display:flex;gap:3px}
+.dot{width:15px;height:15px;border-radius:50%;background:var(--tc);color:var(--surface);font-size:9px;display:grid;place-items:center;font-weight:500;font-family:var(--mono)}
+.tile.dim{opacity:.3}
+.tile.muted{opacity:.55}
+.tile.drop-on{box-shadow:0 0 0 3px var(--hl);transform:scale(1.04)}
+.tile.lifting{opacity:.25}
+.handle{position:absolute;right:-9px;top:50%;width:18px;height:18px;margin-top:-9px;border-radius:50%;background:var(--hl);border:3px solid var(--surface);cursor:crosshair;touch-action:none;z-index:3;box-shadow:0 0 0 1px var(--hl)}
+.handle:hover{transform:scale(1.15)}
+.dragghost{position:fixed;z-index:100;pointer-events:none;margin:0;transform:rotate(-2.5deg) scale(1.05);box-shadow:0 14px 30px color-mix(in srgb,var(--ink) 25%,transparent) !important;opacity:.95}
+svg.live{position:fixed;inset:0;z-index:90;pointer-events:none;width:100vw;height:100vh}
+
+.addbtn{align-self:flex-start;border:1px dashed var(--line);background:transparent;color:var(--muted);border-radius:6px;padding:4px 10px;font-size:13px;cursor:pointer;margin-top:auto}
+.addbtn:hover{border-color:var(--accent);color:var(--accent)}
+.cell-empty{font-family:var(--mono);font-size:11px;color:var(--muted);margin:auto 0}
+.composer{position:relative;z-index:2;background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:8px;display:grid;gap:6px;box-shadow:0 0 0 3px var(--accent-soft)}
+.kt{display:flex;gap:4px}
+.kt button{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:5px;padding:3px 6px;font-size:12px;cursor:pointer}
+.kt button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.composer input,.composer textarea{font-size:13.5px;padding:6px 8px}
+.composer textarea{min-height:44px}
+.cbar{display:flex;gap:6px;align-items:center}
+.cbar .more{margin-right:auto}
+
+/* Thread bar */
+.tbar{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0;align-items:center}
+.lg{display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 12px 3px 3px;cursor:pointer;font-size:13px;font-weight:500}
+.lg.on{border-color:var(--tc);box-shadow:inset 0 0 0 1px var(--tc)}
+.lg.off{opacity:.45}
+.badge{flex:none;width:22px;height:22px;border-radius:50%;background:var(--tc);color:var(--surface);display:grid;place-items:center;font-family:var(--mono);font-size:11.5px;font-weight:500}
+.tedit{width:100%;background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--tc);border-radius:var(--r);padding:12px;display:grid;gap:10px;margin-top:4px}
+.tedit .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.tedit .row input{flex:1;min-width:200px;font-weight:600}
+.seq{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.seq .step{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:6px;padding:3px 3px 3px 8px;font-size:13px;background:var(--bg)}
+.seq .step .c{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.seq .ar{color:var(--tc);font-weight:700}
+.seq .step button{border:0;background:transparent;cursor:pointer;color:var(--muted);padding:2px 6px;border-radius:4px;font-size:12px}
+.seq .step button:hover{color:var(--ink);background:var(--line)}
+
+/* Story */
+.narr{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:28px;margin-top:30px;align-items:start}
+@media (max-width:900px){.narr{grid-template-columns:1fr}}
+.narr h2{font-size:22px;font-stretch:112%}
+.prose{font-family:var(--read);font-size:18px;line-height:1.55;max-width:65ch}
+.editable{border-radius:4px;padding:2px 4px;margin:0 -4px;white-space:pre-wrap;outline:none}
+.editable:hover{background:color-mix(in srgb,var(--accent-soft) 60%,transparent)}
+.editable:focus{background:var(--surface);box-shadow:0 0 0 1px var(--line)}
+.editable:empty::before{content:attr(data-placeholder);color:var(--muted);font-style:italic}
+.thread-narr{border-left:4px solid var(--tc);padding:2px 0 2px 16px;margin:22px 0}
+.thread-narr h3{font-size:17px;font-stretch:110%;display:flex;gap:8px;align-items:center}
+.path{display:flex;flex-wrap:wrap;gap:4px 6px;margin:6px 0 8px;font-family:var(--mono);font-size:11.5px;color:var(--muted);align-items:center}
+.path .pn{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--ink)}
+.path .ar{color:var(--tc)}
+.ev{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.ev.thin{color:var(--warn)}
+.row-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+aside.side{display:grid;gap:18px}
+.card-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card-box h3{font-size:15px;font-stretch:110%;margin-bottom:8px}
+.insights{margin:0;padding:0;list-style:none;display:grid;gap:10px;counter-reset:ins}
+.insights li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:6px;font-size:14.5px;counter-increment:ins}
+.insights li::before{content:counter(ins);font-family:var(--mono);font-size:11px;color:var(--hl);padding-top:3px}
+.gaps{margin:0;padding:0;list-style:none;display:grid;gap:8px;font-size:13.5px}
+.gaps li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px}
+.sev{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;border-radius:3px;padding:2px 5px;height:fit-content}
+.sev.w{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.sev.i{background:var(--accent-soft);color:var(--accent)}
+.sev.ok{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)}
+
+/* Layers */
+.overlay{position:fixed;inset:0;background:color-mix(in srgb,var(--ink) 38%,transparent);z-index:50;display:grid;place-items:center;padding:16px}
+.folder-ov{backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);background:color-mix(in srgb,var(--bg) 55%,transparent)}
+.folder{background:color-mix(in srgb,var(--surface) 92%,var(--accent-soft));border:1px solid var(--line);border-radius:20px;width:min(620px,100%);max-height:86vh;overflow:auto;padding:22px;display:grid;gap:12px;box-shadow:0 30px 60px color-mix(in srgb,var(--ink) 22%,transparent)}
+.folder .fcell{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center}
+.folder input.fname{font-family:var(--display);font-stretch:112%;font-weight:700;font-size:24px;text-align:center;border:0;background:transparent;box-shadow:none;padding:2px}
+.folder input.fname:focus{background:var(--surface);box-shadow:0 0 0 2px var(--accent-soft)}
+.folder input.fsum{text-align:center;border:0;background:transparent;color:var(--muted);font-size:14px}
+.folder input.fsum:focus{background:var(--surface);color:var(--ink)}
+.folder .tiles{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.folder .tiles .tile{touch-action:none}
+.fbar{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.dialog{background:var(--surface);border-radius:12px;border:1px solid var(--line);max-width:560px;width:100%;max-height:88vh;overflow:auto;display:grid;gap:12px;padding:18px}
+.dialog h3{font-size:17px}
+.dialog .bar{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center}
+.dialog .bar .left{margin-right:auto}
+.dialog textarea.code{min-height:300px;font-family:var(--mono);font-size:12px}
+.drawer-ov{place-items:stretch end;padding:0}
+.drawer{background:var(--surface);width:min(440px,100%);height:100%;overflow:auto;padding:20px;display:grid;gap:14px;align-content:start;border-left:1px solid var(--line)}
+.drawer h3{font-size:18px;font-stretch:110%}
+.drawer .grp{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.drawer .two{display:grid;grid-template-columns:44px minmax(0,1.4fr) minmax(0,1fr);gap:6px;align-items:center}
+.drawer .two b{font-family:var(--display);font-stretch:125%;color:var(--accent)}
+.pop{position:fixed;z-index:70;background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--tc);border-radius:10px;padding:12px;width:280px;display:grid;gap:8px;box-shadow:0 12px 30px color-mix(in srgb,var(--ink) 20%,transparent)}
+.pop .bar{display:flex;justify-content:flex-end;gap:6px}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 10px 9px 14px;border-radius:8px;font-size:14px;z-index:80;max-width:min(560px,calc(100% - 32px));display:flex;gap:12px;align-items:center}
+.toast button{background:transparent;border:1px solid color-mix(in srgb,var(--bg) 40%,transparent);color:var(--bg);border-radius:5px;padding:3px 9px;cursor:pointer;font-size:13px}
+.hidden{display:none !important}
+@media (prefers-reduced-motion: reduce){.spin{animation:none}.tile,.mc{transition:none}}
+@media (max-width:640px){.modes a{padding:5px 8px}.modes a .n{display:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="mark">
+      <svg width="20" height="20" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v20M14 1v20M1 8h20M1 14h20" stroke="currentColor" stroke-width="1" opacity=".5"/><path d="M4.5 17.5 C 9 17, 9 11, 11 11 S 15 5, 17.5 4.5" fill="none" stroke="var(--hl)" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Horizon Blueprint</span>
+    </div>
+    <div class="board-pick">
+      <select id="boardSel" aria-label="Choose a board"></select>
+    </div>
+    <nav class="modes" id="modes" aria-label="Board mode">
+      <a href="#collect" data-v="collect"><span class="n">1</span>Collect</a>
+      <a href="#cluster" data-v="cluster"><span class="n">2</span>Cluster</a>
+      <a href="#connect" data-v="connect"><span class="n">3</span>Connect</a>
+      <a href="#story" data-v="story"><span class="n">4</span>Story</a>
+    </nav>
+    <span class="spacer"></span>
+    <span class="status" id="status" aria-live="polite"></span>
+    <div class="tools">
+      <button class="btn icon" type="button" data-act="undo" id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo">↶ Undo</button>
+      <button class="btn" type="button" data-act="openSettings">Board settings</button>
+      <details class="menu" id="moreMenu"><summary class="btn">More</summary>
+        <div class="mlist">
+          <button type="button" data-act="newBoard">New blank board</button>
+          <button type="button" data-act="exportMd">Export narrative (Markdown)</button>
+          <button type="button" data-act="exportJson">Export data (JSON)</button>
+          <button type="button" data-act="importJson">Import data…</button>
+        </div>
+      </details>
+      <input type="file" id="importFile" accept=".json,application/json" class="hidden">
+    </div>
+  </div>
+  <div class="hint" id="hint"></div>
+</header>
+<main id="view"></main>
+<div id="layer"></div>
+
+<script>
+(function(){
+"use strict";
+const COLS=["H1","H2","H3"];
+const ROWS=["customer","people","partners"];
+const TC=["var(--t1)","var(--t2)","var(--t3)","var(--t4)","var(--t5)","var(--t6)"];
+const MODES=["collect","cluster","connect","story"];
+
+const uid=p=>p+Math.random().toString(36).slice(2,9);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clone=o=>JSON.parse(JSON.stringify(o));
+const $=s=>document.querySelector(s);
+
+function defaultFrame(){return{
+  horizons:{
+    H1:{label:"Current plan cycle",period:"",hint:"Work that is planned, funded or already under way in this cycle."},
+    H2:{label:"Next plan cycle",period:"",hint:"What the next cycle should pick up: options, pilots and bets being shaped now."},
+    H3:{label:"Beyond the plan",period:"",hint:"Longer-range shifts and ambitions that sit outside any current plan."}
+  },
+  layers:{
+    customer:{label:"Customer / market",hint:"Needs, behaviours, segments, competitors and market shifts."},
+    people:{label:"People / operations",hint:"Teams, skills, processes, ways of working and the operating model."},
+    partners:{label:"Partners / technology",hint:"Suppliers, platforms, data, infrastructure and the wider ecosystem."}
+  }
+};}
+function blankBoard(){const f=defaultFrame();return{id:uid("b_"),isExample:false,updatedAt:Date.now(),title:"Untitled blueprint",purpose:"",horizons:f.horizons,layers:f.layers,items:[],themes:[],threads:[],narrative:{overview:"",insights:[],generated:""}};}
+
+function exampleBoard(){
+  const f=defaultFrame();
+  f.horizons.H1.period="2026–27";f.horizons.H2.period="2028–29";f.horizons.H3.period="2030 onward";
+  const I=(id,kind,col,row,text,detail,ref)=>({id,kind,col,row,text,detail:detail||"",ref:ref||""});
+  const items=[
+    I("i1","source","H1","customer","Off-peak ridership on rural routes has fallen since 2023","Steepest on routes with hourly or worse frequency.","Ticketing data (example)"),
+    I("i4","topic","H1","customer","Real-time arrival information at rural stops","Riders say they avoid off-peak buses because they can't tell if one is coming."),
+    I("i2","topic","H1","customer","Flexible day tickets for part-time commuters"),
+    I("i3","source","H1","customer","Most surveyed commuters now work from home two or more days a week","","Customer survey (example)"),
+    I("i5","topic","H2","customer","On-demand minibus zones for village clusters","Book by app or phone, replaces two low-use fixed routes."),
+    I("i6","topic","H2","customer","Pilot demand-responsive service in two areas before scaling"),
+    I("i7","topic","H2","customer","One account across bus, rail and bike hire"),
+    I("i8","source","H2","customer","Most trips to the district hospital involve a change","","Origin–destination study (example)"),
+    I("i9","topic","H3","customer","Mobility subscription for whole households"),
+    I("i10","topic","H3","customer","Bus as the default for under-25s"),
+    I("i11","source","H1","people","Driver vacancies are concentrated in the northern depots","","HR dashboard (example)"),
+    I("i12","source","H1","people","Split shifts are the most cited reason for drivers leaving","","Exit interviews (example)"),
+    I("i13","topic","H1","people","Depots own their local timetables","Lets depots design shifts around their own routes."),
+    I("i14","topic","H2","people","Drivers as community transport hosts in on-demand zones"),
+    I("i15","topic","H2","people","Dispatch team to run demand-responsive bookings"),
+    I("i16","topic","H3","people","Self-scheduled rosters across all depots"),
+    I("i17","source","H1","partners","Ticket machines reach end of supplier support in 2027","","Supplier notice (example)"),
+    I("i18","topic","H1","partners","Open fares data feed for journey planners"),
+    I("i19","topic","H2","partners","Shared booking platform with the county council"),
+    I("i20","topic","H2","partners","Account-based ticketing agreed with the rail operator"),
+    I("i21","topic","H3","partners","Regional mobility data partnership"),
+    I("i22","topic","H3","partners","Electric minibus fleet through a leasing partner")
+  ];
+  const T=(id,col,row,name,summary,ids)=>({id,col,row,name,summary,itemIds:ids});
+  const themes=[
+    T("t1","H1","customer","Hybrid-work fares","Commuting patterns have changed faster than the fare model.",["i2","i3"]),
+    T("t2","H1","customer","Rural reliability gap","Off-peak rural riders leave when the service feels unpredictable.",["i1","i4"]),
+    T("t3","H2","customer","On-demand rural service","Replace thin fixed routes with bookable zones.",["i5","i6"]),
+    T("t4","H2","customer","Joined-up journeys","Trips that cross modes need one account and one fare.",["i7","i8"]),
+    T("t5","H3","customer","Mobility as a subscription","Sell access to getting around, not individual tickets.",["i9","i10"]),
+    T("t6","H1","people","Driver retention","Vacancies and shift patterns limit what can be run.",["i11","i12"]),
+    T("t7","H1","people","Local network ownership","Depots shape timetables and shifts around their routes.",["i13"]),
+    T("t8","H2","people","New frontline roles","On-demand service needs hosts and dispatchers, not just drivers.",["i14","i15"]),
+    T("t9","H3","people","Flexible workforce model","Rosters that staff choose rather than receive.",["i16"]),
+    T("t10","H1","partners","Ticketing platform renewal","A forced replacement that sets the fares platform for a decade.",["i17","i18"]),
+    T("t11","H2","partners","Shared booking and accounts","Booking and account infrastructure shared with council and rail.",["i19","i20"]),
+    T("t12","H3","partners","Regional mobility platform","Pooled data and booking across the region's operators.",["i21"])
+  ];
+  const threads=[
+    {id:"th1",name:"Rural access on demand",themeIds:["t2","t3","t8","t11","t12"],rationale:"Unreliable rural routes point to bookable service, which needs new roles and shared booking infrastructure.",narrative:"Rural riders are leaving off-peak services because they can't rely on them. On-demand zones in the next cycle address that directly, but they only work with new frontline roles (hosts and dispatchers) and a booking platform shared with the county council. That shared platform is the seed of a regional mobility platform beyond the plan. Most of this thread is ideas rather than evidence, so the H2 pilot should be designed to produce data."},
+    {id:"th2",name:"Accounts that follow the rider",themeIds:["t1","t10","t4","t11","t5"],rationale:"Flexible fares need new ticketing; account-based ticketing unlocks joined-up journeys and subscriptions.",narrative:"Flexible fares for hybrid workers depend on replacing ticket machines that lose support in 2027. If the replacement is account-based rather than a like-for-like swap, it opens joined-up journeys with rail in the next cycle and household subscriptions after that. The renewal decision this cycle is the hinge for the whole thread."},
+    {id:"th3",name:"Shifts people choose",themeIds:["t6","t7","t9"],rationale:"Retention problems are driven by shift design; local ownership is the first step to self-scheduling.",narrative:"Driver retention is the most urgent operational problem and the best evidenced. Giving depots ownership of local timetables is a low-cost way to cut split shifts this cycle, and it builds the habits needed for self-scheduled rosters across the network later on."}
+  ];
+  return{
+    id:"example",isExample:true,updatedAt:0,
+    title:"Northline Buses (example)",
+    purpose:"Where should Northline focus to grow ridership outside the city core over the next two plan cycles and beyond?",
+    horizons:f.horizons,layers:f.layers,items,themes,threads,
+    narrative:{generated:"example",
+      overview:"Northline's strongest signals today sit in the customer layer: hybrid working has broken the commuter fare model, and rural off-peak services are losing riders because they are hard to rely on. Both problems point to the same longer-term move, from a fixed timetable sold as tickets to a service people reach through an account and book when they need it.\n\nThe binding constraint is people rather than technology. Driver vacancies and split shifts limit what can be piloted in the next cycle, so the workforce thread has to start now for the other two to land.",
+      insights:[
+        "The ticketing renewal in H1 feeds two of the three threads. Treat it as a strategic choice, not an IT replacement.",
+        "Every H3 theme is built on ideas alone. Add sources (trends, comparable operators) before committing to the long-term direction.",
+        "The electric minibus fleet sits outside every theme and thread, yet on-demand zones would need small vehicles. It may belong in the rural access thread."
+      ]}
+  };
+}
+
+
+
+/* ---------- State ---------- */
+let board=exampleBoard();
+let boards=[];
+const ui={mode:"collect",sel:null,folder:null,naming:false,edit:null,settings:false,pop:null,compose:null,busy:null,confirmDel:false,dialog:null};
+const caps={db:null,user:null,sample:null,downloads:null,uid:null};
+let hist=[];
+
+const hz=c=>board.horizons[c];
+const ly=r=>board.layers[r];
+const cellName=(c,r)=>`${c} · ${ly(r).label}`;
+const short=r=>ly(r).label.split("/")[0].trim();
+const itemById=id=>board.items.find(i=>i.id===id);
+const themeById=id=>board.themes.find(t=>t.id===id);
+const themeOfItem=id=>board.themes.find(t=>t.itemIds.includes(id));
+const threadById=id=>board.threads.find(t=>t.id===id);
+const threadColor=th=>TC[board.threads.indexOf(th)%TC.length];
+const threadsOfTheme=id=>board.threads.filter(th=>th.themeIds.includes(id));
+const words=(s,n)=>s.split(/\s+/).slice(0,n).join(" ");
+
+/* ---------- Undo ---------- */
+function content(){const b=clone(board);delete b.id;delete b.isExample;delete b.updatedAt;return b}
+function snap(){hist.push(JSON.stringify(content()));if(hist.length>80)hist.shift();updUndo()}
+function undo(){
+  if(!hist.length)return;
+  const prev=JSON.parse(hist.pop());
+  board=Object.assign(prev,{id:board.id,isExample:board.isExample,updatedAt:board.updatedAt});
+  if(ui.sel&&!threadById(ui.sel))ui.sel=null;
+  if(ui.folder&&!themeById(ui.folder))ui.folder=null;
+  if(ui.edit&&!itemById(ui.edit))ui.edit=null;
+  ui.pop=null;touch(true);render();updUndo();
+}
+function updUndo(){const b=$("#undoBtn");if(b)b.disabled=!hist.length}
+
+/* ---------- Persistence ---------- */
+const LS="hb.boards.v1";
+function lsRead(){try{return JSON.parse(localStorage.getItem(LS)||"{}")}catch(e){return{}}}
+function lsWrite(o){try{localStorage.setItem(LS,JSON.stringify(o));return true}catch(e){return false}}
+function userCol(){return caps.db.collection("data/users/"+caps.uid)}
+const usingDb=()=>!!(caps.db&&caps.uid);
+async function listBoards(){
+  if(usingDb()){
+    const snap=await userCol().get();
+    return snap.docs.filter(d=>d.exists&&d.id.startsWith("board-")).map(d=>{const v=d.data();return{id:v.board.id,title:v.board.title,updatedAt:v.board.updatedAt||0}});
+  }
+  return Object.values(lsRead()).map(b=>({id:b.id,title:b.title,updatedAt:b.updatedAt||0}));
+}
+async function loadBoard(id){
+  if(usingDb()){const s=await userCol().doc("board-"+id).get();return s.exists?clone(s.data().board):null}
+  const all=lsRead();return all[id]?clone(all[id]):null;
+}
+async function persist(b){
+  if(usingDb()){await userCol().doc("board-"+b.id).set({board:clone(b)});return"db"}
+  const all=lsRead();all[b.id]=clone(b);return lsWrite(all)?"local":"none";
+}
+async function removeBoard(id){
+  if(usingDb()){await userCol().doc("board-"+id).delete();return}
+  const all=lsRead();delete all[id];lsWrite(all);
+}
+let saveTimer=null,saving=false,pending=false;
+function setStatus(t,warn){const s=$("#status");s.textContent=t;s.classList.toggle("warn",!!warn)}
+function touch(picker){
+  if(board.isExample){board.isExample=false;board.id=uid("b_");board.title=board.title.replace(" (example)"," (my copy)");picker=true}
+  board.updatedAt=Date.now();
+  setStatus("Unsaved changes");
+  clearTimeout(saveTimer);saveTimer=setTimeout(doSave,900);
+  if(picker)upsertPicker();
+}
+async function doSave(){
+  if(saving){pending=true;return}
+  saving=true;setStatus("Saving…");
+  try{
+    const w=await persist(board);upsertPicker();
+    if(w==="db")setStatus("Saved");else if(w==="local")setStatus("Saved in this browser only",true);else setStatus("Not saved: export your data to keep it",true);
+  }catch(e){setStatus(e&&e.code==="quota_exceeded"?"Storage full: export and delete old boards":"Couldn't save. Export your data to keep it",true)}
+  finally{saving=false;if(pending){pending=false;doSave()}}
+}
+function upsertPicker(){
+  if(!board.isExample){
+    const i=boards.findIndex(b=>b.id===board.id);const rec={id:board.id,title:board.title,updatedAt:board.updatedAt};
+    if(i>=0)boards[i]=rec;else boards.push(rec);
+  }
+  renderPicker();
+}
+function renderPicker(){
+  const list=boards.slice().sort((a,b)=>b.updatedAt-a.updatedAt);
+  $("#boardSel").innerHTML=list.map(b=>`<option value="${esc(b.id)}"${b.id===board.id?" selected":""}>${esc(b.title||"Untitled blueprint")}</option>`).join("")+
+    `<option value="example"${board.isExample?" selected":""}>Northline Buses (example)</option>`;
+}
+
+/* ---------- Board operations ---------- */
+function detach(itemId){board.themes.forEach(t=>t.itemIds=t.itemIds.filter(x=>x!==itemId))}
+function removeTheme(id){board.themes=board.themes.filter(t=>t.id!==id);board.threads.forEach(th=>th.themeIds=th.themeIds.filter(x=>x!==id));board.threads=board.threads.filter(th=>th.themeIds.length>=2)}
+function prune(){board.themes.filter(t=>!t.itemIds.length).map(t=>t.id).forEach(removeTheme)}
+function newTheme(col,row,ids,name){const t={id:uid("t_"),col,row,name:name||"New theme",summary:"",itemIds:ids};board.themes.push(t);return t}
+function ensureTheme(spec){
+  const [k,id]=spec.split(":");
+  if(k==="theme")return themeById(id);
+  const it=itemById(id);if(!it)return null;
+  const ex=themeOfItem(id);if(ex)return ex;
+  return newTheme(it.col,it.row,[id],words(it.text,5));
+}
+function moveItemTo(it,col,row){it.col=col;it.row=row}
+
+function dropItem(itemId,tgt){
+  const it=itemById(itemId);if(!it||!tgt)return;
+  let [k,v]=tgt.split(/:(.*)/s);
+  const cur=themeOfItem(itemId);
+  if(ui.mode==="collect"&&k!=="cell"){
+    const o=k==="item"?itemById(v):themeById(v);if(!o)return;k="cell";v=o.col+"|"+o.row;
+  }
+  if(k==="cell"){
+    const [c,r]=v.split("|");
+    if(it.col===c&&it.row===r&&!cur)return;
+    snap();
+    detach(itemId);
+    moveItemTo(it,c,r);prune();touch();render();return;
+  }
+  if(k==="theme"){
+    const th=themeById(v);if(!th||th===cur)return;
+    snap();detach(itemId);moveItemTo(it,th.col,th.row);th.itemIds.push(itemId);prune();touch();render();
+    toast(`Added to “${th.name}”`);return;
+  }
+  if(k==="item"){
+    const other=itemById(v);if(!other||other.id===itemId)return;
+    const ot=themeOfItem(other.id);
+    if(ot){if(ot===cur)return;dropItem(itemId,"theme:"+ot.id);return}
+    snap();detach(itemId);moveItemTo(it,other.col,other.row);
+    const t=newTheme(other.col,other.row,[other.id,itemId],"");
+    prune();touch();ui.folder=t.id;ui.naming=true;render();
+  }
+}
+function dropTheme(themeId,tgt){
+  const th=themeById(themeId);if(!th||!tgt)return;
+  let [k,v]=tgt.split(/:(.*)/s);
+  if(ui.mode==="collect"&&k!=="cell"){const o=k==="item"?itemById(v):themeById(v);if(!o)return;k="cell";v=o.col+"|"+o.row}
+  if(k==="cell"){
+    const [c,r]=v.split("|");if(th.col===c&&th.row===r)return;
+    snap();th.col=c;th.row=r;th.itemIds.forEach(id=>moveItemTo(itemById(id),c,r));touch();render();return;
+  }
+  if(k==="theme"){
+    const o=themeById(v);if(!o||o===th)return;
+    snap();
+    th.itemIds.forEach(id=>{const i=itemById(id);moveItemTo(i,o.col,o.row);o.itemIds.push(id)});
+    board.threads.forEach(t=>{t.themeIds=t.themeIds.map(x=>x===th.id?o.id:x).filter((x,i,a)=>a.indexOf(x)===i)});
+    th.itemIds=[];removeTheme(th.id);touch();render();toast(`Merged into “${o.name}”`);return;
+  }
+  if(k==="item"){
+    const it=itemById(v);if(!it)return;const ot=themeOfItem(it.id);
+    if(ot){dropTheme(themeId,"theme:"+ot.id);return}
+    snap();th.col=it.col;th.row=it.row;th.itemIds.forEach(id=>moveItemTo(itemById(id),it.col,it.row));th.itemIds.push(it.id);touch();render();
+  }
+}
+function dropLink(from,tgt,x,y){
+  if(!tgt)return;
+  const [fk,fid]=from.split(":"),[tk,tid]=tgt.split(":");
+  if(tk!=="theme"&&tk!=="item")return;
+  if(fk===tk&&fid===tid)return;
+  const fromTheme=fk==="theme"?themeById(fid):themeOfItem(fid);
+  const toTheme=tk==="theme"?themeById(tid):themeOfItem(tid);
+  if(fromTheme&&toTheme&&fromTheme===toTheme)return;
+  let th=null;
+  if(fromTheme){
+    const sel=ui.sel&&threadById(ui.sel);
+    if(sel&&sel.themeIds[sel.themeIds.length-1]===fromTheme.id)th=sel;
+    else{const ends=board.threads.filter(t=>t.themeIds[t.themeIds.length-1]===fromTheme.id);if(ends.length===1)th=ends[0]}
+  }
+  if(th&&toTheme&&th.themeIds.includes(toTheme.id)){toast(`“${toTheme.name}” is already in “${th.name||"this thread"}”`);return}
+  snap();
+  const A=ensureTheme(from),B=ensureTheme(tgt);if(!A||!B)return;
+  if(th){
+    th.themeIds.push(B.id);ui.sel=th.id;touch();render();toast(`Extended “${th.name}”`);return;
+  }
+  th={id:uid("th_"),name:"",themeIds:[A.id,B.id],rationale:"",narrative:""};
+  board.threads.push(th);ui.sel=th.id;ui.pop={id:th.id,x,y};touch();render();
+}
+
+/* ---------- Claude ---------- */
+function parseLoose(t){
+  if(typeof t!=="string")return t;
+  const a=t.indexOf("{"),b=t.lastIndexOf("}");
+  if(a<0||b<a)throw{message:"Claude's reply wasn't in the expected format. Try again."};
+  return JSON.parse(t.slice(a,b+1));
+}
+async function askJSON(prompt){
+  const s=caps.sample;if(!s)throw{message:"Claude isn't available on this page."};
+  let r;
+  try{r=await s(prompt,{modelTier:"default",cache:false})}
+  catch(e){
+    if(e&&e.code==="not_granted"){caps.sample=null;render()}
+    if(e&&e.code==="rate_limited")throw{message:"Claude is busy right now. Wait a minute and try again."};
+    throw e;
+  }
+  return parseLoose(r.text);
+}
+function boardContext(){
+  return `Board: ${board.title}\nPurpose: ${board.purpose||"(not stated)"}\nColumns (horizons): ${COLS.map(c=>`${c} = ${hz(c).label}${hz(c).period?" ("+hz(c).period+")":""}`).join("; ")}\nRows (business stack layers): ${ROWS.map(r=>`${r} = ${ly(r).label}`).join("; ")}`;
+}
+const itemLine=i=>`${i.id} | ${i.col}|${i.row} | ${i.kind==="source"?"SOURCE (fact)":"TOPIC (idea)"} | ${i.text}${i.detail?" — "+i.detail:""}${i.ref?" [ref: "+i.ref+"]":""}`;
+const themeLine=t=>`${t.id} | ${t.col}|${t.row} | ${t.name||"(unnamed)"}${t.summary?" — "+t.summary:""} | inputs: ${t.itemIds.map(id=>{const i=itemById(id);return i?(i.kind==="source"?"[fact] ":"[idea] ")+i.text:""}).join("; ")}`;
+
+async function autoCluster(){
+  const loose=board.items.filter(i=>!themeOfItem(i.id));
+  if(!loose.length){toast("Every card is already in a stack.");return}
+  ui.busy="cluster";render();
+  const prompt=`You are helping facilitate a Horizon Blueprint workshop. Cards sit in a 3x3 board: columns are planning horizons, rows are layers of the business stack. Each card is a TOPIC (an idea, opportunity or question) or a SOURCE (a fact or observation). Participants group cards in the same cell into named stacks (themes).
+
+${boardContext()}
+
+Existing stacks (id | cell | name — summary | cards):
+${board.themes.map(themeLine).join("\n")||"(none)"}
+
+Cards not yet in a stack (id | cell | kind | text):
+${loose.map(itemLine).join("\n")}
+
+Task: place every unstacked card. Put a card into an existing stack in the SAME cell when it clearly belongs there; otherwise group it with other unstacked cards from the same cell into a new stack. A card that stands alone may become a one-card stack. Never mix cells. Do not change existing stacks other than adding cards.
+Name new stacks in 2 to 5 plain words; give each a one-sentence summary in plain UK English. Do not invent facts.
+
+Return JSON only:
+{"assign":[{"itemId":"i9","themeId":"t3"}],"newStacks":[{"cell":"H1|customer","name":"...","summary":"...","itemIds":["i1","i2"]}]}`;
+  try{
+    const out=await askJSON(prompt);
+    const looseIds=new Set(loose.map(i=>i.id));const used=new Set();
+    const ops=[];
+    for(const a of (out.assign||[])){const it=itemById(a.itemId),th=themeById(a.themeId);if(it&&th&&looseIds.has(it.id)&&!used.has(it.id)&&th.col===it.col&&th.row===it.row){used.add(it.id);ops.push(()=>th.itemIds.push(it.id))}}
+    const fresh=[];
+    for(const n of (out.newStacks||[])){
+      const [c,r]=String(n.cell||"").split("|");if(!COLS.includes(c)||!ROWS.includes(r))continue;
+      const ids=(n.itemIds||[]).filter(id=>looseIds.has(id)&&!used.has(id)&&itemById(id).col===c&&itemById(id).row===r);
+      if(!ids.length)continue;ids.forEach(id=>used.add(id));
+      fresh.push({col:c,row:r,name:String(n.name||"Theme").slice(0,80),summary:String(n.summary||"").slice(0,280),ids});
+    }
+    if(!used.size)throw{message:"Claude didn't return a usable grouping. Try again."};
+    snap();ops.forEach(f=>f());fresh.forEach(f=>{const t=newTheme(f.col,f.row,f.ids,f.name);t.summary=f.summary});
+    touch();ui.busy=null;render();
+    toast(`Claude placed ${used.size} card${used.size>1?"s":""} into stacks`,true);return;
+  }catch(e){toast(e.message||"Something went wrong asking Claude.")}
+  ui.busy=null;render();
+}
+async function autoConnect(){
+  if(board.themes.length<2){toast("Make at least two stacks first.");return}
+  ui.busy="connect";render();
+  const prompt=`You are helping facilitate a Horizon Blueprint workshop. Cards were grouped into named stacks (themes) inside a 3x3 board (columns are horizons H1 to H3, rows are layers of the business stack). Stacks are now connected into threads.
+
+${boardContext()}
+
+Stacks (id | cell | name — summary | cards):
+${board.themes.map(themeLine).join("\n")}
+
+Existing threads (do not repeat them):
+${board.threads.map(t=>`${t.name||"(unnamed)"}: ${t.themeIds.join(" -> ")}`).join("\n")||"(none)"}
+
+A thread is an ordered chain of 2 to 6 stacks telling one story of change, usually moving from H1 toward H3 and often crossing layers (a customer need, the operational change it depends on, the partner or technology that enables it). A stack can be in more than one thread. Propose up to 4 NEW threads that add the most insight about where impact lies. Prefer threads spanning at least two horizons. Propose none if the existing threads already cover it.
+
+Name each thread in 2 to 6 plain words, with a one-sentence rationale in plain UK English.
+
+Return JSON only:
+{"threads":[{"name":"...","themeIds":["t1","t4"],"rationale":"..."}]}`;
+  try{
+    const out=await askJSON(prompt);
+    const add=(out.threads||[]).map(t=>({id:uid("th_"),name:String(t.name||"Thread").slice(0,80),rationale:String(t.rationale||"").slice(0,400),narrative:"",themeIds:[...new Set((t.themeIds||[]).filter(id=>themeById(id)))]})).filter(t=>t.themeIds.length>=2);
+    if(!add.length){toast("Claude didn't find new threads beyond the ones you have.");ui.busy=null;render();return}
+    snap();board.threads=board.threads.concat(add);ui.sel=null;touch();ui.busy=null;render();
+    toast(`Claude added ${add.length} thread${add.length>1?"s":""}`,true);return;
+  }catch(e){toast(e.message||"Something went wrong asking Claude.")}
+  ui.busy=null;render();
+}
+async function suggestName(){
+  const t=themeById(ui.folder);if(!t)return;
+  ui.busy="name";renderLayer();
+  const prompt=`Name a group of cards from a strategy workshop board.\n${boardContext()}\nThe cards sit in ${cellName(t.col,t.row)}:\n${t.itemIds.map(id=>"- "+itemLine(itemById(id))).join("\n")}\n\nGive a theme name of 2 to 5 plain words saying what the cards share, and a one-sentence summary in plain UK English. Do not invent facts.\nReturn JSON only: {"name":"...","summary":"..."}`;
+  try{const o=await askJSON(prompt);if(o.name){snap();t.name=String(o.name).slice(0,80);t.summary=String(o.summary||t.summary).slice(0,280);touch()}}
+  catch(e){toast(e.message||"Something went wrong asking Claude.")}
+  ui.busy=null;renderLayer();
+}
+async function writeNarrative(){
+  if(!board.themes.length){toast("Make some stacks first.");return}
+  ui.busy="narr";render();
+  const th=board.threads.map(t=>`${t.id} | ${t.name} | path: ${t.themeIds.map(id=>{const x=themeById(id);return x?`${x.name} [${x.col}|${x.row}]`:""}).join(" -> ")} | rationale: ${t.rationale}`).join("\n");
+  const loose=board.items.filter(i=>!themeOfItem(i.id));
+  const prompt=`You are writing up the output of a Horizon Blueprint planning exercise for the people who took part and their stakeholders.
+
+${boardContext()}
+
+Themes (id | cell | name — summary | cards, marked [fact] or [idea]):
+${board.themes.map(themeLine).join("\n")}
+
+Threads (id | name | ordered path | rationale):
+${th||"(none yet)"}
+
+Cards not in any theme:
+${loose.map(itemLine).join("\n")||"(none)"}
+
+Write:
+1. "overview": two short paragraphs (separated by a blank line) on where the blueprint says the most impact lies and what has to be true for it to happen.
+2. "threads": for each thread, one paragraph (3 to 5 sentences) that tells its story from present to future, names the dependencies across layers, and says how well evidenced it is (facts versus ideas).
+3. "insights": 3 to 5 single-sentence insights: tensions, dependencies, gaps, weak evidence, or where to act first.
+
+Style: plain UK English, direct, no hype, no headings, no bullet characters inside strings. Use only what is on the board; do not invent facts or figures.
+
+Return JSON only:
+{"overview":"...","threads":[{"id":"th1","narrative":"..."}],"insights":["..."]}`;
+  try{
+    const out=await askJSON(prompt);
+    if(typeof out.overview!=="string")throw{message:"Claude's reply wasn't in the expected format. Try again."};
+    snap();
+    board.narrative.overview=out.overview.trim();
+    board.narrative.insights=(out.insights||[]).map(String).filter(Boolean).slice(0,8);
+    board.narrative.generated="claude";
+    for(const t of (out.threads||[])){const x=threadById(t.id);if(x&&t.narrative)x.narrative=String(t.narrative).trim()}
+    touch();
+  }catch(e){toast(e.message||"Something went wrong asking Claude.")}
+  ui.busy=null;render();
+}
+
+/* ---------- Structural analysis ---------- */
+function evidence(themeIds){
+  let s=0,t=0;
+  themeIds.forEach(id=>{const x=themeById(id);if(!x)return;x.itemIds.forEach(i=>{const it=itemById(i);if(!it)return;it.kind==="source"?s++:t++})});
+  return{s,t};
+}
+function gaps(){
+  const out=[];
+  const loose=board.items.filter(i=>!themeOfItem(i.id));
+  if(loose.length)out.push(["w",`${loose.length} card${loose.length>1?"s are":" is"} not in any stack: ${loose.slice(0,3).map(i=>"“"+i.text+"”").join(", ")}${loose.length>3?"…":""}`]);
+  const empty=[];COLS.forEach(c=>ROWS.forEach(r=>{if(!board.items.some(i=>i.col===c&&i.row===r))empty.push(cellName(c,r))}));
+  if(empty.length)out.push(["w",`No cards yet in ${empty.join("; ")}.`]);
+  const orphan=board.themes.filter(t=>!threadsOfTheme(t.id).length);
+  if(orphan.length)out.push(["i",`${orphan.length} theme${orphan.length>1?"s sit":" sits"} outside every thread: ${orphan.map(t=>t.name||"(unnamed)").join(", ")}.`]);
+  board.threads.forEach(th=>{
+    const nm=th.name||"Unnamed thread";
+    const cols=new Set(th.themeIds.map(id=>(themeById(id)||{}).col).filter(Boolean));
+    if(cols.size<2)out.push(["i",`“${nm}” stays within one horizon, so it doesn't yet show a route to the future.`]);
+    if(!th.themeIds.some(id=>(themeById(id)||{}).col==="H1"))out.push(["i",`“${nm}” has no H1 theme, so nothing in the current cycle moves it forward.`]);
+    const e=evidence(th.themeIds);if(e.s===0&&e.t>0)out.push(["w",`“${nm}” rests on ideas only, with no sources behind it.`]);
+  });
+  const h3=board.items.filter(i=>i.col==="H3");
+  if(h3.length&&!h3.some(i=>i.kind==="source"))out.push(["i","H3 has no sources. Trends or comparable cases would make the long view easier to defend."]);
+  if(!out.length&&board.items.length)out.push(["ok","No structural gaps: every card is stacked, every theme is threaded and every cell has content."]);
+  return out;
+}
+function draftFromStructure(){
+  snap();
+  const n=board.items.length,s=board.items.filter(i=>i.kind==="source").length;
+  const counts={};board.themes.forEach(t=>{counts[t.col+"|"+t.row]=(counts[t.col+"|"+t.row]||0)+t.itemIds.length});
+  const top=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+  const longest=board.threads.slice().sort((a,b)=>b.themeIds.length-a.themeIds.length)[0];
+  let o=`${board.title} brings together ${n} card${n===1?"":"s"} (${s} source${s===1?"":"s"} and ${n-s} topic${n-s===1?"":"s"}), grouped into ${board.themes.length} theme${board.themes.length===1?"":"s"} and connected by ${board.threads.length} thread${board.threads.length===1?"":"s"}.`;
+  if(top){const [c,r]=top[0].split("|");o+=` Most material sits in ${cellName(c,r)}.`}
+  if(longest)o+=`\n\nThe longest thread, “${longest.name||"Unnamed thread"}”, runs through ${longest.themeIds.length} themes.`;
+  board.narrative.overview=o;
+  board.threads.forEach(th=>{
+    const ts=th.themeIds.map(themeById).filter(Boolean);if(!ts.length)return;
+    const first=ts[0],last=ts[ts.length-1],mid=ts.slice(1,-1);const e=evidence(th.themeIds);
+    th.narrative=`Starts with “${first.name}” in ${cellName(first.col,first.row)}${mid.length?", moves through "+mid.map(t=>"“"+t.name+"”").join(", "):""} and arrives at “${last.name}” in ${cellName(last.col,last.row)}. ${th.rationale?th.rationale+" ":""}It draws on ${e.s} source${e.s===1?"":"s"} and ${e.t} topic${e.t===1?"":"s"}.`;
+  });
+  board.narrative.insights=gaps().filter(g=>g[0]!=="ok").map(g=>g[1]).slice(0,5);
+  board.narrative.generated="draft";
+  touch();render();
+}
+
+/* ---------- Rendering ---------- */
+const HINTS={
+  collect:"<b>Collect.</b> Select + in any cell to add a topic or source. Drag a card to move it to another cell. Select a card to edit it.",
+  cluster:"<b>Cluster.</b> Drag a card onto another card to stack them into a theme. Drag onto a stack to add to it. Select a stack to rename it or take cards out.",
+  connect:"<b>Connect.</b> Drag from the orange handle on one stack to another to start a thread. Drag from the last stack of a thread to extend it. Select a line or a thread below to edit it.",
+  story:"<b>Story.</b> The finished blueprint and its narrative. Select a thread to focus it. Everything in the narrative is editable."
+};
+function claudeBtn(act,label,key){
+  if(!caps.sample)return"";
+  return `<button class="btn claude sm" type="button" data-act="${act}"${ui.busy?" disabled":""}>${ui.busy===key?'<span class="spin" aria-hidden="true"></span> Asking Claude…':label}</button>`;
+}
+function render(){
+  document.querySelectorAll("#modes a").forEach(a=>{if(a.dataset.v===ui.mode)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
+  let acts="";
+  if(ui.mode==="cluster")acts=claudeBtn("autoCluster","Auto-cluster","cluster");
+  if(ui.mode==="connect")acts=claudeBtn("autoConnect","Auto-connect","connect");
+  $("#hint").innerHTML=`<span>${HINTS[ui.mode]}</span><span class="acts">${acts}</span>`;
+  document.body.classList.toggle("dragmode",ui.mode!=="story");
+  const s=board.items.filter(i=>i.kind==="source").length;
+  const head=`${board.isExample?`<div class="notice">This is a worked example. Change anything and it becomes your own copy; the original stays in the board list.</div>`:""}
+  <div class="bp-head"><div><span class="eyebrow">Horizon Blueprint</span><h1>${esc(board.title)}</h1>${board.purpose?`<p>${esc(board.purpose)}</p>`:`<p><button class="btn sm" type="button" data-act="openSettings">Add the question this board answers</button></p>`}</div>
+    <div class="stats"><div><b>${board.items.length}</b>cards</div><div><b>${s}</b>sources</div><div><b>${board.themes.length}</b>themes</div><div><b>${board.threads.length}</b>threads</div></div></div>`;
+  $("#view").innerHTML=head+`<div class="board-scroll"><div class="board" id="board"><svg class="threads" aria-hidden="true"></svg>${boardHTML()}</div></div>`+threadBar()+(ui.mode==="story"?storyHTML():"");
+  if(ui.mode==="connect"||ui.mode==="story")requestAnimationFrame(drawThreads);
+  renderLayer();updUndo();
+  if(ui.compose){const t=$("#cmp-text");if(t&&document.activeElement!==t&&ui.compose.focus){t.focus();ui.compose.focus=false}}
+}
+function boardHTML(){
+  const M=ui.mode;
+  let h=`<div class="corner">horizon →<br>layer ↓</div>`+COLS.map(c=>`<div class="colh"><div class="k">${c}</div><div class="l">${esc(hz(c).label)}</div><div class="p">${esc(hz(c).period)||"&nbsp;"}</div></div>`).join("");
+  ROWS.forEach((r,ri)=>{
+    const last=ri===ROWS.length-1?" last":"";
+    h+=`<div class="rowh${last}"><span class="ix">L${ri+1}</span>${esc(ly(r).label)}</div>`;
+    COLS.forEach(c=>{
+      const key=c+"|"+r;
+      const ths=board.themes.filter(t=>t.col===c&&t.row===r);
+      const loose=board.items.filter(i=>i.col===c&&i.row===r&&!themeOfItem(i.id));
+      const sel=ui.sel&&threadById(ui.sel);
+      let tiles=ths.map(t=>{
+        const tr=threadsOfTheme(t.id);const e=evidence([t.id]);
+        const dim=(M==="connect"||M==="story")&&sel&&!sel.themeIds.includes(t.id);
+        const dots=(M==="connect"||M==="story")?`<span class="dots">${tr.map(x=>`<span class="dot" style="--tc:${threadColor(x)}">${board.threads.indexOf(x)+1}</span>`).join("")}</span>`:"";
+        const drag=M!=="story"?` data-drag="theme:${t.id}" data-drop="theme:${t.id}"`:"";
+        return `<div class="tile stack${dim?" dim":""}" role="button" tabindex="0"${drag} data-node="${t.id}" data-act="openFolder" data-id="${t.id}" aria-label="Theme ${esc(t.name||"unnamed")}, ${t.itemIds.length} cards">
+          <div class="nm">${esc(t.name||"Unnamed theme")}</div>
+          <div class="pv">${t.itemIds.slice(0,3).map(id=>{const i=itemById(id);return i?`<span>${esc(i.text)}</span>`:""}).join("")}</div>
+          <div class="mt"><span>${t.itemIds.length} card${t.itemIds.length>1?"s":""}${e.s?` · ${e.s} src`:""}</span>${dots}</div>
+          ${M==="connect"?`<span class="handle" data-drag="link:theme:${t.id}" title="Drag to another stack to connect" aria-hidden="true"></span>`:""}
+        </div>`;
+      }).join("");
+      tiles+=loose.map(i=>{
+        const drag=M!=="story"?` data-drag="item:${i.id}" data-drop="item:${i.id}"`:"";
+        const muted=(M==="connect"||M==="story")?" muted":"";
+        return `<div class="tile card ${i.kind}${muted}" role="button" tabindex="0"${drag} data-act="editItem" data-id="${i.id}">${i.kind==="source"?`<span class="k">Source</span><br>`:""}${esc(i.text)}${i.ref?`<span class="ref">${esc(i.ref)}</span>`:""}${M==="connect"?`<span class="handle" data-drag="link:item:${i.id}" title="Drag to a stack to connect" aria-hidden="true"></span>`:""}</div>`;
+      }).join("");
+      let foot="";
+      if(M==="collect"){
+        if(ui.compose&&ui.compose.cell===key)foot=composerHTML();
+        else foot=`<button class="addbtn" type="button" data-act="compose" data-k="${key}">+ Add card</button>`;
+      }
+      const empty=!ths.length&&!loose.length&&M!=="collect"?`<span class="cell-empty">empty</span>`:"";
+      h+=`<div class="mc ${c}${last}" data-drop="cell:${key}">${tiles?`<div class="tiles">${tiles}</div>`:""}${empty}${foot}</div>`;
+    });
+  });
+  return h;
+}
+function composerHTML(){
+  const C=ui.compose;
+  return `<div class="composer" role="group" aria-label="Add a card">
+    <div class="kt" role="group" aria-label="Card type"><button type="button" data-act="ckind" data-k="topic" aria-pressed="${C.kind==="topic"}">Topic</button><button type="button" data-act="ckind" data-k="source" aria-pressed="${C.kind==="source"}">Source</button></div>
+    <label class="sr" for="cmp-text">Card text</label>
+    <input type="text" id="cmp-text" data-cbind="text" value="${esc(C.text)}" maxlength="200" placeholder="${C.kind==="source"?"A fact or observation…":"An idea, opportunity or question…"}" autocomplete="off">
+    ${C.more||C.kind==="source"?`${C.kind==="source"?`<input type="text" data-cbind="ref" aria-label="Reference" value="${esc(C.ref)}" placeholder="Reference: report, dataset, interview">`:""}${C.more?`<textarea data-cbind="detail" aria-label="Detail" placeholder="Detail (optional)">${esc(C.detail)}</textarea>`:""}`:""}
+    <div class="cbar"><button class="btn ghost sm more" type="button" data-act="cmore">${C.more?"Less":"Add detail"}</button><button class="btn ghost sm" type="button" data-act="cclose">Done</button><button class="btn primary sm" type="button" data-act="cadd">Add</button></div>
+  </div>`;
+}
+function threadBar(){
+  if(ui.mode!=="connect"&&ui.mode!=="story")return"";
+  if(!board.threads.length)return ui.mode==="connect"?`<div class="tbar"><span class="help" style="margin:0">No threads yet. Drag from a handle to another stack to start one.</span></div>`:"";
+  let h=`<div class="tbar" role="group" aria-label="Threads">${board.threads.map((th,ix)=>`<button type="button" class="lg${ui.sel===th.id?" on":ui.sel?" off":""}" style="--tc:${threadColor(th)}" data-act="selThread" data-id="${th.id}" aria-pressed="${ui.sel===th.id}"><span class="badge">${ix+1}</span>${esc(th.name||"Unnamed thread")}</button>`).join("")}`;
+  const th=ui.sel&&threadById(ui.sel);
+  if(th&&ui.mode==="connect"){
+    h+=`<div class="tedit" style="--tc:${threadColor(th)}">
+      <div class="row"><span class="badge">${board.threads.indexOf(th)+1}</span><label class="sr" for="ten">Thread name</label><input type="text" id="ten" data-bind="thread.${th.id}.name" value="${esc(th.name)}" placeholder="Name this thread"><button class="btn sm ghost danger" type="button" data-act="delThread" data-id="${th.id}">Delete thread</button><button class="btn sm" type="button" data-act="selThread" data-id="${th.id}">Close</button></div>
+      <div class="seq">${th.themeIds.map((id,k)=>{const t=themeById(id);if(!t)return"";return `${k?'<span class="ar" aria-hidden="true">→</span>':""}<span class="step"><span><span class="c">${t.col} · ${esc(short(t.row))}</span><br>${esc(t.name||"Unnamed theme")}</span><button type="button" data-act="mv" data-th="${th.id}" data-k="${k}" data-d="-1" aria-label="Move earlier"${k===0?" disabled":""}>←</button><button type="button" data-act="mv" data-th="${th.id}" data-k="${k}" data-d="1" aria-label="Move later"${k===th.themeIds.length-1?" disabled":""}>→</button><button type="button" data-act="rmStep" data-th="${th.id}" data-k="${k}" aria-label="Remove from thread">✕</button></span>`}).join("")}</div>
+      <div><label class="lbl" for="ter">Why these connect</label><textarea id="ter" rows="2" data-bind="thread.${th.id}.rationale" placeholder="What links each step to the next?">${esc(th.rationale)}</textarea></div>
+    </div>`;
+  }
+  return h+`</div>`;
+}
+function storyHTML(){
+  const nar=board.narrative;
+  const blocks=board.threads.map((th,ix)=>{
+    const e=evidence(th.themeIds);
+    return `<div class="thread-narr" style="--tc:${threadColor(th)}"><h3><span class="badge">${ix+1}</span>${esc(th.name||"Unnamed thread")}</h3>
+      <div class="path">${th.themeIds.map((id,k)=>{const t=themeById(id);return t?`${k?'<span class="ar">→</span>':""}<span class="pn">${t.col}</span>${esc(t.name)}`:""}).join(" ")}</div>
+      <div class="prose editable" contenteditable="plaintext-only" data-edit="thn.${th.id}" data-placeholder="Write the story of this thread, or generate it above.">${esc(th.narrative)}</div>
+      <div class="ev${e.s===0?" thin":""}">${e.s} source${e.s===1?"":"s"} · ${e.t} topic${e.t===1?"":"s"}${e.s===0?" · ideas only":""}</div></div>`;
+  }).join("");
+  const g=gaps();
+  return `<div class="narr">
+    <div>
+      <div class="row-actions" style="justify-content:space-between"><h2>Narrative</h2><div class="row-actions" style="margin:0">${claudeBtn("writeNarrative",nar.overview?"Rewrite with Claude":"Write with Claude","narr")}<button class="btn sm" type="button" data-act="draft"${ui.busy?" disabled":""}>Draft from structure</button></div></div>
+      <div class="prose editable" contenteditable="plaintext-only" data-edit="overview" data-placeholder="An overview of where the most impact lies. Generate a draft, or write your own.">${esc(nar.overview)}</div>
+      ${blocks}
+    </div>
+    <aside class="side">
+      <div class="card-box"><h3>Insights</h3>
+        ${nar.insights.length?`<ol class="insights">${nar.insights.map((t,ix)=>`<li><div class="editable" contenteditable="plaintext-only" data-edit="ins.${ix}">${esc(t)}</div><button class="btn sm ghost" type="button" data-act="delIns" data-ix="${ix}" aria-label="Remove insight">✕</button></li>`).join("")}</ol>`:`<p class="help">Insights appear when you generate the narrative. You can add your own too.</p>`}
+        <button class="btn sm" type="button" data-act="addIns" style="margin-top:10px">Add insight</button>
+      </div>
+      <div class="card-box"><h3>Gaps and signals</h3><p class="help">Checked automatically from the board's structure.</p>
+        <ul class="gaps">${g.map(x=>`<li><span class="sev ${x[0]}">${x[0]==="w"?"gap":x[0]==="ok"?"ok":"note"}</span><span>${esc(x[1])}</span></li>`).join("")||`<li><span class="sev i">note</span><span>Add cards to see gaps.</span></li>`}</ul>
+      </div>
+    </aside>
+  </div>`;
+}
+function drawThreads(){
+  const m=document.getElementById("board");if(!m||(ui.mode!=="connect"&&ui.mode!=="story"))return;
+  const svg=m.querySelector("svg.threads");const mb=m.getBoundingClientRect();
+  svg.setAttribute("width",m.offsetWidth);svg.setAttribute("height",m.offsetHeight);svg.setAttribute("viewBox",`0 0 ${m.offsetWidth} ${m.offsetHeight}`);
+  const pt={};
+  m.querySelectorAll("[data-node]").forEach(el=>{const r=el.getBoundingClientRect();pt[el.dataset.node]={x:r.left-mb.left+r.width/2,y:r.top-mb.top+r.height/2}});
+  let out="";
+  board.threads.forEach((th,ti)=>{
+    const pts=th.themeIds.map(id=>{const p=pt[id];if(!p)return null;const l=threadsOfTheme(id);const off=(l.indexOf(th)-(l.length-1)/2)*7;return{x:p.x+off,y:p.y+off}}).filter(Boolean);
+    if(pts.length<2)return;
+    let d=`M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    for(let i=1;i<pts.length;i++){
+      const a=pts[i-1],b=pts[i],dx=b.x-a.x,dy=b.y-a.y;
+      if(Math.abs(dx)>40)d+=` C${(a.x+dx*.5).toFixed(1)},${a.y.toFixed(1)} ${(b.x-dx*.5).toFixed(1)},${b.y.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`;
+      else{const bow=46;d+=` C${(a.x+bow).toFixed(1)},${(a.y+dy*.3).toFixed(1)} ${(b.x+bow).toFixed(1)},${(b.y-dy*.3).toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`}
+    }
+    const on=ui.sel===th.id,op=ui.sel?(on?1:.1):.85;
+    out+=`<path d="${d}" style="stroke:${TC[ti%TC.length]};opacity:${op}" fill="none" stroke-width="${on?4.5:3}" stroke-linecap="round"/>`;
+    out+=`<path class="hit" d="${d}" stroke="transparent" stroke-width="16" fill="none" data-act="selThread" data-id="${th.id}"/>`;
+  });
+  svg.innerHTML=out;
+}
+
+/* ---------- Layer: folder, editor, settings, popover, dialog, toast ---------- */
+let toastState=null,toastT=null;
+function toast(msg,canUndo){toastState={msg,canUndo};renderLayer();clearTimeout(toastT);toastT=setTimeout(()=>{toastState=null;renderLayer()},canUndo?7000:4000)}
+function renderLayer(){
+  let h="";
+  const f=ui.folder&&themeById(ui.folder);
+  if(f){
+    h+=`<div class="overlay folder-ov" data-act="closeLayer"><div class="folder" data-stop="1" role="dialog" aria-modal="true" aria-label="Theme">
+      <div class="fcell">${esc(cellName(f.col,f.row))}</div>
+      <label class="sr" for="fname">Theme name</label>
+      <input type="text" class="fname" id="fname" data-bind="theme.${f.id}.name" value="${esc(f.name)}" placeholder="Name this theme" autocomplete="off">
+      <label class="sr" for="fsum">Summary</label>
+      <input type="text" class="fsum" id="fsum" data-bind="theme.${f.id}.summary" value="${esc(f.summary)}" placeholder="One line: what do these cards have in common?" autocomplete="off">
+      <div class="tiles">${f.itemIds.map(id=>{const i=itemById(id);return i?`<div class="tile card ${i.kind}" data-drag="item:${i.id}" data-act="editItem" data-id="${i.id}" role="button" tabindex="0">${i.kind==="source"?`<span class="k">Source</span><br>`:""}${esc(i.text)}${i.ref?`<span class="ref">${esc(i.ref)}</span>`:""}</div>`:""}).join("")}</div>
+      <p class="help" style="text-align:center;margin:0">Drag a card out onto the board to take it out of this theme.</p>
+      <div class="fbar">${caps.sample?`<button class="btn claude sm" type="button" data-act="suggestName"${ui.busy?" disabled":""}>${ui.busy==="name"?'<span class="spin" aria-hidden="true"></span> Thinking…':"Suggest a name"}</button>`:""}<button class="btn sm" type="button" data-act="ungroup">Ungroup</button><button class="btn primary sm" type="button" data-act="closeLayer">Done</button></div>
+    </div></div>`;
+  }
+  const e=ui.edit&&itemById(ui.edit);
+  if(e){
+    h+=`<div class="overlay" data-act="closeLayer"><div class="dialog" data-stop="1" role="dialog" aria-modal="true" aria-labelledby="edT">
+      <h3 id="edT">Edit card <span class="help" style="font-family:var(--mono);font-size:11px">${esc(cellName(e.col,e.row))}</span></h3>
+      <div class="kt" role="group" aria-label="Card type"><button type="button" data-act="ekind" data-k="topic" aria-pressed="${e.kind==="topic"}">Topic: an idea or question</button><button type="button" data-act="ekind" data-k="source" aria-pressed="${e.kind==="source"}">Source: a fact with a reference</button></div>
+      <div><label class="lbl" for="ed-text">Text</label><input type="text" id="ed-text" data-bind="item.${e.id}.text" value="${esc(e.text)}" maxlength="200"></div>
+      <div><label class="lbl" for="ed-detail">Detail</label><textarea id="ed-detail" data-bind="item.${e.id}.detail" placeholder="Context, implications, who raised it">${esc(e.detail)}</textarea></div>
+      ${e.kind==="source"?`<div><label class="lbl" for="ed-ref">Reference</label><input type="text" id="ed-ref" data-bind="item.${e.id}.ref" value="${esc(e.ref)}" placeholder="Report, dataset, interview, link"></div>`:""}
+      <div class="bar"><button class="btn ghost danger left" type="button" data-act="delItem" data-id="${e.id}">Delete card</button><button class="btn primary" type="button" data-act="closeLayer">Done</button></div>
+    </div></div>`;
+  }
+  if(ui.settings){
+    h+=`<div class="overlay drawer-ov" data-act="closeLayer"><div class="drawer" data-stop="1" role="dialog" aria-modal="true" aria-labelledby="stT">
+      <h3 id="stT">Board settings</h3>
+      <div><label class="lbl" for="s-title">Board name</label><input type="text" id="s-title" data-bind="title" value="${esc(board.title)}"></div>
+      <div><label class="lbl" for="s-purpose">Question or ambition</label><textarea id="s-purpose" data-bind="purpose" placeholder="What is this board trying to work out?">${esc(board.purpose)}</textarea></div>
+      <div class="grp"><b>Horizons (columns)</b><p class="help" style="margin:0">Planning cycles rather than years: current plan, next plan, beyond the plan.</p>
+        ${COLS.map(c=>`<div class="two"><b>${c}</b><input type="text" aria-label="${c} label" data-bind="h.${c}.label" value="${esc(hz(c).label)}"><input type="text" aria-label="${c} period" data-bind="h.${c}.period" value="${esc(hz(c).period)}" placeholder="Period"></div>`).join("")}</div>
+      <div class="grp"><b>Business stack (rows)</b>
+        ${ROWS.map((r,ix)=>`<div class="two" style="grid-template-columns:44px minmax(0,1fr)"><b>L${ix+1}</b><input type="text" aria-label="Layer ${ix+1} name" data-bind="l.${r}.label" value="${esc(ly(r).label)}"></div>`).join("")}</div>
+      <div class="grp">
+        ${board.isExample?`<p class="help" style="margin:0">This is the example board. Edits make your own copy.</p>`:ui.confirmDel?`<p class="help" style="margin:0">Delete “${esc(board.title)}” for good?</p><div class="row-actions" style="margin:0"><button class="btn danger" type="button" data-act="delBoard">Delete board</button><button class="btn ghost" type="button" data-act="cancelDel">Keep it</button></div>`:`<div><button class="btn ghost danger" type="button" data-act="askDel">Delete this board</button></div>`}
+      </div>
+      <div><button class="btn primary" type="button" data-act="closeLayer">Done</button></div>
+    </div></div>`;
+  }
+  const p=ui.pop&&threadById(ui.pop.id);
+  if(p){
+    const x=Math.max(12,Math.min(ui.pop.x-140,window.innerWidth-292)),y=Math.max(12,Math.min(ui.pop.y+16,window.innerHeight-170));
+    h+=`<div class="pop" style="left:${x}px;top:${y}px;--tc:${threadColor(p)}" role="dialog" aria-label="Name this thread"><label class="lbl" for="popName">Name this thread</label><input type="text" id="popName" data-bind="thread.${p.id}.name" value="${esc(p.name)}" placeholder="e.g. Rural access on demand" autocomplete="off"><div class="bar"><button class="btn primary sm" type="button" data-act="closePop">Done</button></div></div>`;
+  }
+  if(ui.dialog){
+    h+=`<div class="overlay" data-act="closeLayer"><div class="dialog" data-stop="1" role="dialog" aria-modal="true" aria-labelledby="dlT"><h3 id="dlT">${esc(ui.dialog.title)}</h3><p class="help" style="margin:0">Copy this and save it wherever you keep your work.</p><textarea class="code" id="dlgText" readonly>${esc(ui.dialog.text)}</textarea><div class="bar"><button class="btn primary" type="button" data-act="copyDialog">Copy</button><button class="btn" type="button" data-act="closeLayer">Close</button></div></div></div>`;
+  }
+  if(toastState)h+=`<div class="toast" role="status"><span>${esc(toastState.msg)}</span>${toastState.canUndo&&hist.length?`<button type="button" data-act="undo">Undo</button>`:""}</div>`;
+  $("#layer").innerHTML=h;
+  if(f&&ui.naming){const n=$("#fname");if(n){n.focus();n.select()}ui.naming=false}
+  if(p&&!ui.pop.focused){const n=$("#popName");if(n){n.focus()}ui.pop.focused=true}
+}
+function closeLayer(){
+  const wasFolder=ui.folder;
+  if(ui.folder){const t=themeById(ui.folder);if(t&&!t.name.trim()){t.name=words(itemById(t.itemIds[0]).text,4);touch()}}
+  ui.folder=null;ui.edit=null;ui.settings=false;ui.dialog=null;ui.confirmDel=false;
+  render();
+  if(wasFolder){const el=document.querySelector(`[data-node="${wasFolder}"]`);el&&el.focus()}
+}
+function closePop(){
+  const t=ui.pop&&threadById(ui.pop.id);
+  if(t&&!t.name.trim()){t.name="Thread "+(board.threads.indexOf(t)+1);touch()}
+  ui.pop=null;render();
+}
+
+/* ---------- Drag and drop ---------- */
+let drag=null,suppressClick=false;
+document.addEventListener("pointerdown",e=>{
+  if(e.button>0||ui.mode==="story")return;
+  const el=e.target.closest("[data-drag]");if(!el)return;
+  if(e.target.closest("input,textarea,button:not(.tile)"))return;
+  drag={spec:el.dataset.drag,el,sx:e.clientX,sy:e.clientY,started:false,tgt:null,tEl:null,inFolder:!!el.closest(".folder")};
+});
+window.addEventListener("pointermove",e=>{
+  if(!drag)return;
+  if(!drag.started){
+    if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<6)return;
+    startDrag(e);
+  }
+  e.preventDefault();
+  if(drag.link){
+    drag.line.setAttribute("x2",e.clientX);drag.line.setAttribute("y2",e.clientY);
+  }else{
+    drag.ghost.style.left=(e.clientX-drag.ox)+"px";drag.ghost.style.top=(e.clientY-drag.oy)+"px";
+  }
+  const hit=document.elementFromPoint(e.clientX,e.clientY);
+  let t=hit&&hit.closest("[data-drop]");
+  if(t&&!validTarget(t.dataset.drop))t=drag.link?null:(t.closest(".mc")||null);
+  if(t&&!validTarget(t.dataset.drop))t=null;
+  if(t!==drag.tEl){if(drag.tEl)drag.tEl.classList.remove("drop-on");drag.tEl=t;if(t)t.classList.add("drop-on")}
+},{passive:false});
+function validTarget(spec){
+  if(!spec)return false;
+  const [k,v]=spec.split(/:(.*)/s);
+  if(drag.link){
+    if(k==="cell")return false;
+    const own=drag.spec.slice(5);if(own===spec)return false;
+    const a=own.startsWith("theme:")?themeById(own.slice(6)):themeOfItem(own.slice(5));
+    const b=k==="theme"?themeById(v):themeOfItem(v);
+    return !(a&&b&&a===b);
+  }
+  if(spec===drag.spec)return false;
+  if(drag.spec.startsWith("item:")&&k==="theme"){const th=themeById(v);if(th&&th.itemIds.includes(drag.spec.slice(5)))return false}
+  if(drag.spec.startsWith("theme:")&&k==="item"){const th=themeById(drag.spec.slice(6));if(th&&th.itemIds.includes(v))return false}
+  return true;
+}
+function startDrag(e){
+  drag.started=true;document.body.classList.add("dragging");
+  if(drag.spec.startsWith("link:")){
+    drag.link=true;
+    const r=drag.el.getBoundingClientRect();
+    const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("class","live");
+    const ln=document.createElementNS("http://www.w3.org/2000/svg","line");
+    ln.setAttribute("x1",r.left+r.width/2);ln.setAttribute("y1",r.top+r.height/2);ln.setAttribute("x2",e.clientX);ln.setAttribute("y2",e.clientY);
+    ln.setAttribute("stroke-width","3");ln.setAttribute("stroke-linecap","round");ln.setAttribute("stroke-dasharray","6 6");ln.style.stroke="var(--hl)";
+    svg.appendChild(ln);document.body.appendChild(svg);drag.svg=svg;drag.line=ln;
+    return;
+  }
+  const r=drag.el.getBoundingClientRect();
+  const g=drag.el.cloneNode(true);g.classList.add("dragghost");g.classList.remove("drop-on");
+  g.querySelectorAll(".handle").forEach(n=>n.remove());
+  g.style.width=r.width+"px";g.style.left=r.left+"px";g.style.top=r.top+"px";
+  document.body.appendChild(g);drag.ghost=g;drag.ox=e.clientX-r.left;drag.oy=e.clientY-r.top;
+  drag.el.classList.add("lifting");
+  if(drag.inFolder){ui.folder=null;renderLayer();render()}
+}
+function endDrag(e,cancel){
+  if(!drag)return;
+  const d=drag;drag=null;
+  if(!d.started)return;
+  document.body.classList.remove("dragging");
+  suppressClick=true;setTimeout(()=>suppressClick=false,0);
+  if(d.ghost)d.ghost.remove();if(d.svg)d.svg.remove();
+  if(d.tEl)d.tEl.classList.remove("drop-on");
+  if(d.el)d.el.classList.remove("lifting");
+  const tgt=cancel||!d.tEl?null:d.tEl.dataset.drop;
+  if(!tgt)return;
+  if(d.link)dropLink(d.spec.slice(5),tgt,e.clientX,e.clientY);
+  else if(d.spec.startsWith("item:"))dropItem(d.spec.slice(5),tgt);
+  else if(d.spec.startsWith("theme:"))dropTheme(d.spec.slice(6),tgt);
+}
+window.addEventListener("pointerup",e=>endDrag(e,false));
+window.addEventListener("pointercancel",e=>endDrag(e,true));
+
+/* ---------- Export / import ---------- */
+function toMarkdown(){
+  const L=[];
+  L.push(`# ${board.title}`,"");
+  if(board.purpose)L.push(`> ${board.purpose}`,"");
+  L.push(COLS.map(c=>`**${c}** ${hz(c).label}${hz(c).period?" ("+hz(c).period+")":""}`).join(" · "),"");
+  L.push("## Overview","",board.narrative.overview||"_Not written yet._","");
+  if(board.threads.length){L.push("## Threads","");board.threads.forEach((th,ix)=>{
+    const e=evidence(th.themeIds);
+    L.push(`### ${ix+1}. ${th.name||"Unnamed thread"}`,"",th.themeIds.map(id=>{const t=themeById(id);return t?`${t.name} (${t.col}, ${ly(t.row).label})`:""}).filter(Boolean).join(" → "),"");
+    if(th.narrative)L.push(th.narrative,"");
+    L.push(`_Evidence: ${e.s} sources, ${e.t} topics._`,"");
+  })}
+  if(board.narrative.insights.length){L.push("## Insights","");board.narrative.insights.forEach(t=>L.push(`- ${t}`));L.push("")}
+  const g=gaps();if(g.length){L.push("## Gaps and signals","");g.forEach(x=>L.push(`- ${x[1]}`));L.push("")}
+  L.push("## Board","");
+  ROWS.forEach(r=>COLS.forEach(c=>{
+    const ths=board.themes.filter(t=>t.col===c&&t.row===r);const loose=board.items.filter(i=>i.col===c&&i.row===r&&!themeOfItem(i.id));
+    if(!ths.length&&!loose.length)return;
+    L.push(`### ${c} · ${ly(r).label}`,"");
+    ths.forEach(t=>{L.push(`**${t.name}**${t.summary?" — "+t.summary:""}`);t.itemIds.forEach(id=>{const i=itemById(id);if(i)L.push(`- ${i.kind==="source"?"[source] ":""}${i.text}${i.ref?" ("+i.ref+")":""}`)});L.push("")});
+    if(loose.length){L.push("_Not in a theme:_");loose.forEach(i=>L.push(`- ${i.text}`));L.push("")}
+  }));
+  return L.join("\n");
+}
+function toJSON(){const b=clone(board);delete b.isExample;return JSON.stringify({format:"horizon-blueprint",version:1,board:b},null,2)}
+function slug(){return (board.title||"blueprint").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,48)||"blueprint"}
+async function offer(filename,text,title){
+  if(caps.downloads){try{await caps.downloads.save({filename,data:text});return}catch(e){}}
+  ui.dialog={title,text};renderLayer();
+}
+function importText(text){
+  let o;try{o=JSON.parse(text)}catch(e){toast("That file isn't valid JSON.");return}
+  const b=o&&o.board?o.board:o;
+  if(!b||!Array.isArray(b.items)){toast("That file isn't a Horizon Blueprint export.");return}
+  const f=defaultFrame();
+  board={id:uid("b_"),isExample:false,updatedAt:Date.now(),title:String(b.title||"Imported blueprint"),purpose:String(b.purpose||""),
+    horizons:Object.assign(f.horizons,b.horizons||{}),layers:Object.assign(f.layers,b.layers||{}),
+    items:b.items.filter(i=>i&&COLS.includes(i.col)&&ROWS.includes(i.row)).map(i=>({id:String(i.id||uid("i_")),kind:i.kind==="source"?"source":"topic",col:i.col,row:i.row,text:String(i.text||""),detail:String(i.detail||""),ref:String(i.ref||"")})),
+    themes:Array.isArray(b.themes)?b.themes:[],threads:Array.isArray(b.threads)?b.threads:[],
+    narrative:Object.assign({overview:"",insights:[],generated:""},b.narrative||{})};
+  hist=[];ui.sel=null;touch(true);render();toast("Imported as a new board.");
+}
+
+/* ---------- Actions ---------- */
+function closeMenu(){const m=$("#moreMenu");if(m)m.open=false}
+const A={
+  undo,
+  openSettings(){closeMenu();ui.settings=true;renderLayer();const t=$("#s-title");t&&t.focus()},
+  newBoard(){closeMenu();board=blankBoard();hist=[];ui.sel=null;ui.compose=null;touch(true);location.hash="collect";render();ui.settings=true;renderLayer();const t=$("#s-title");t&&(t.focus(),t.select())},
+  exportMd(){closeMenu();offer(slug()+".md",toMarkdown(),"Narrative as Markdown")},
+  exportJson(){closeMenu();offer(slug()+".json",toJSON(),"Board data as JSON")},
+  importJson(){closeMenu();$("#importFile").click()},
+  compose(el){ui.compose={cell:el.dataset.k,kind:ui.compose?ui.compose.kind:"topic",text:"",detail:"",ref:"",more:false,focus:true};render()},
+  ckind(el){ui.compose.kind=el.dataset.k;ui.compose.focus=true;render()},
+  cmore(){ui.compose.more=!ui.compose.more;ui.compose.focus=true;render()},
+  cclose(){ui.compose=null;render()},
+  cadd(){
+    const C=ui.compose;if(!C)return;const text=C.text.trim();if(!text){$("#cmp-text").focus();return}
+    const [c,r]=C.cell.split("|");snap();
+    board.items.push({id:uid("i_"),kind:C.kind,col:c,row:r,text,detail:C.detail.trim(),ref:C.kind==="source"?C.ref.trim():""});
+    C.text="";C.detail="";C.ref="";C.focus=true;touch();render();
+  },
+  editItem(el){ui.edit=el.dataset.id;renderLayer();const t=$("#ed-text");t&&t.focus()},
+  ekind(el){const it=itemById(ui.edit);if(!it)return;snap();it.kind=el.dataset.k;touch();render()},
+  delItem(el){const id=el.dataset.id;snap();board.items=board.items.filter(i=>i.id!==id);detach(id);prune();ui.edit=null;touch();render();toast("Card deleted",true)},
+  openFolder(el){if(ui.mode==="story")return;ui.folder=el.dataset.id;renderLayer();const n=$("#fname");n&&n.focus()},
+  ungroup(){const t=themeById(ui.folder);if(!t)return;snap();t.itemIds=[];removeTheme(t.id);ui.folder=null;touch();render();toast("Theme ungrouped",true)},
+  suggestName,autoCluster,autoConnect,writeNarrative,draft:draftFromStructure,
+  closeLayer(el,e){if(e&&el.classList.contains("overlay")&&e.target.closest("[data-stop]"))return;closeLayer()},
+  closePop,
+  selThread(el){ui.sel=ui.sel===el.dataset.id?null:el.dataset.id;render()},
+  delThread(el){snap();board.threads=board.threads.filter(t=>t.id!==el.dataset.id);ui.sel=null;touch();render();toast("Thread deleted",true)},
+  mv(el){const th=threadById(el.dataset.th);const k=+el.dataset.k,j=k+(+el.dataset.d);if(!th||j<0||j>=th.themeIds.length)return;snap();[th.themeIds[k],th.themeIds[j]]=[th.themeIds[j],th.themeIds[k]];touch();render()},
+  rmStep(el){const th=threadById(el.dataset.th);if(!th)return;snap();th.themeIds.splice(+el.dataset.k,1);if(th.themeIds.length<2){board.threads=board.threads.filter(t=>t!==th);ui.sel=null;toast("Thread removed: it needs at least two themes",true)}touch();render()},
+  addIns(){snap();board.narrative.insights.push("");touch();render();const all=document.querySelectorAll('[data-edit^="ins."]');if(all.length)all[all.length-1].focus()},
+  delIns(el){snap();board.narrative.insights.splice(+el.dataset.ix,1);touch();render()},
+  askDel(){ui.confirmDel=true;renderLayer()},
+  cancelDel(){ui.confirmDel=false;renderLayer()},
+  async delBoard(){
+    const id=board.id;
+    try{await removeBoard(id)}catch(e){toast("Couldn't delete that board. Try again.");return}
+    boards=boards.filter(b=>b.id!==id);
+    const next=boards.slice().sort((a,b)=>b.updatedAt-a.updatedAt)[0];
+    board=next?(await loadBoard(next.id).catch(()=>null))||exampleBoard():exampleBoard();
+    hist=[];ui.settings=false;ui.confirmDel=false;renderPicker();setStatus("");render();
+  },
+  async copyDialog(){const t=$("#dlgText");try{await navigator.clipboard.writeText(t.value);toast("Copied.")}catch(e){t.select();toast("Select all and copy.")}}
+};
+
+document.addEventListener("click",e=>{
+  if(suppressClick){e.preventDefault();e.stopPropagation();return}
+  const m=$("#moreMenu");if(m&&m.open&&!e.target.closest("#moreMenu"))m.open=false;
+  const el=e.target.closest("[data-act]");if(!el)return;
+  if(e.target.closest(".handle"))return;
+  const f=A[el.dataset.act];if(f){if(el.tagName==="A")e.preventDefault();f(el,e)}
+},true);
+let editSnapped=null;
+document.addEventListener("focusin",e=>{const el=e.target;if((el.dataset&&(el.dataset.bind||el.dataset.edit))&&editSnapped!==el){snap();editSnapped=el}});
+document.addEventListener("focusout",e=>{if(e.target===editSnapped){editSnapped=null;if((e.target.dataset.bind||"").startsWith("thread.")&&!ui.pop)setTimeout(()=>{if(!document.activeElement||!document.activeElement.closest(".tedit"))render()},0)}});
+document.addEventListener("input",e=>{
+  const el=e.target;
+  if(el.dataset.cbind&&ui.compose){ui.compose[el.dataset.cbind]=el.value;return}
+  if(el.dataset.bind){
+    const p=el.dataset.bind.split(".");const v=el.value;
+    if(p[0]==="title"){board.title=v;touch(true);return}
+    if(p[0]==="purpose")board.purpose=v;
+    else if(p[0]==="h")board.horizons[p[1]][p[2]]=v;
+    else if(p[0]==="l")board.layers[p[1]][p[2]]=v;
+    else if(p[0]==="theme"){const t=themeById(p[1]);if(t)t[p[2]]=v}
+    else if(p[0]==="thread"){const t=threadById(p[1]);if(t)t[p[2]]=v}
+    else if(p[0]==="item"){const t=itemById(p[1]);if(t)t[p[2]]=v}
+    touch();return;
+  }
+  if(el.dataset.edit){
+    const p=el.dataset.edit.split(".");const v=el.innerText.replace(/\n{3,}/g,"\n\n").trim();
+    if(p[0]==="overview")board.narrative.overview=v;
+    else if(p[0]==="thn"){const t=threadById(p[1]);if(t)t.narrative=v}
+    else if(p[0]==="ins")board.narrative.insights[+p[1]]=v;
+    touch();
+  }
+});
+document.addEventListener("change",e=>{
+  const el=e.target;
+  if(el.id==="importFile"){const f=el.files&&el.files[0];if(!f)return;f.text().then(importText);el.value="";return}
+  if(el.id==="boardSel")switchBoard(el.value);
+});
+document.addEventListener("keydown",e=>{
+  const t=e.target;const typing=t.matches&&t.matches("input,textarea,[contenteditable]");
+  if(e.key==="Enter"&&t.id==="cmp-text"){e.preventDefault();A.cadd();return}
+  if(e.key==="Enter"&&(t.id==="fname"||t.id==="fsum"||t.id==="ed-text"||t.id==="ed-ref")){e.preventDefault();closeLayer();return}
+  if(e.key==="Enter"&&t.id==="popName"){e.preventDefault();closePop();return}
+  if(e.key==="Escape"){
+    if(drag){endDrag(e,true);return}
+    if(ui.pop){closePop();return}
+    if(ui.folder||ui.edit||ui.settings||ui.dialog){closeLayer();return}
+    if(ui.compose){ui.compose=null;render();return}
+    if(ui.sel){ui.sel=null;render();return}
+  }
+  if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&e.key.toLowerCase()==="z"&&!typing){e.preventDefault();undo();return}
+  if((e.key==="Enter"||e.key===" ")&&t.classList&&t.classList.contains("tile")){e.preventDefault();t.click()}
+});
+
+async function switchBoard(id){
+  if(saveTimer){clearTimeout(saveTimer);saveTimer=null;await doSave()}
+  if(id==="example")board=exampleBoard();
+  else{const b=await loadBoard(id).catch(()=>null);if(!b){toast("Couldn't open that board.");renderPicker();return}board=b}
+  hist=[];ui.sel=null;ui.folder=null;ui.edit=null;ui.compose=null;ui.pop=null;
+  setStatus(board.isExample?"":(usingDb()?"Saved":"Saved in this browser only"),!board.isExample&&!usingDb());
+  renderPicker();render();
+}
+function route(){const h=location.hash.replace("#","");ui.mode=MODES.includes(h)?h:"collect";ui.pop=null;if(ui.mode!=="collect")ui.compose=null;render()}
+window.addEventListener("hashchange",route);
+if("ResizeObserver" in window)new ResizeObserver(()=>requestAnimationFrame(drawThreads)).observe(document.body);
+else window.addEventListener("resize",drawThreads);
+
+/* ---------- Boot ---------- */
+renderPicker();route();
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>drawThreads());
+const use=n=>(window.claude&&typeof window.claude.use==="function")?Promise.resolve(window.claude.use(n)).catch(()=>null):Promise.resolve(null);
+(async function init(){
+  const [db,user,sample,downloads]=await Promise.all([use("db"),use("user"),use("sample"),use("downloads")]);
+  caps.db=db;caps.user=user;caps.sample=sample;caps.downloads=downloads;
+  if(db&&user){try{caps.uid=await user.id()}catch(e){caps.uid=null}}
+  try{boards=await listBoards()}catch(e){caps.db=null;boards=await listBoards().catch(()=>[])}
+  const latest=boards.slice().sort((a,b)=>b.updatedAt-a.updatedAt)[0];
+  if(latest&&board.isExample&&!hist.length){
+    const b=await loadBoard(latest.id).catch(()=>null);
+    if(b){board=b;setStatus(usingDb()?"Saved":"Saved in this browser only",!usingDb())}
+  }
+  renderPicker();render();
+})();
+})();
+</script>
+</body>
+</html>

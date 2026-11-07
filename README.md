@@ -29,4 +29,8 @@ Board settings let you rename the horizons and layers. Every action can be undon
 
 It's a single self-contained `index.html` with no build step. Open it in a browser, or serve it with GitHub Pages.
 
-Run outside claude.ai, boards are saved in the browser's local storage. Use **More → Export data** to keep a JSON copy, and **Import** to load it again. The Claude-assisted features (auto-cluster, auto-connect, name suggestions and the written narrative) are only available when the page runs as a Claude artifact. "Draft from structure" works everywhere.
+Run outside claude.ai, boards are saved in the browser's local storage. Use **More → Export data** to keep a JSON copy, and **Import** to load it again.
+
+## Claude features
+
+Auto-cluster, auto-connect, name suggestions and the written narrative use Claude. When the page runs as a Claude artifact they work with no setup. Anywhere else, open **Board settings** and add your own Anthropic API key (get one from the [Anthropic Console](https://console.anthropic.com/settings/keys)). The key is stored only in that browser and sent only to Anthropic, and usage is billed to your Anthropic account. Without a key, "Draft from structure" still writes a basic narrative from the board.

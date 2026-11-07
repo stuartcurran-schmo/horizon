@@ -88,10 +88,10 @@ details.menu .mlist button:hover{background:var(--accent-soft)}
 .btn[disabled]{opacity:.45;cursor:default}
 .btn.sm{padding:3px 8px;font-size:12.5px}
 .btn.icon{padding:5px 8px}
-input[type=text],textarea,select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%}
+input[type=text],input[type=password],textarea,select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%}
 select{width:auto;padding:5px 8px}
 textarea{resize:vertical;min-height:60px}
-input[type=text]:focus,textarea:focus,select:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+input[type=text]:focus,input[type=password]:focus,textarea:focus,select:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
 label.lbl{display:block;font-weight:600;font-size:13px;margin-bottom:4px}
 .help{color:var(--muted);font-size:13px;margin:2px 0 8px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -547,6 +547,33 @@ function dropLink(from,tgt,x,y){
 }
 
 /* ---------- Claude ---------- */
+const inClaude=!!(window.claude&&typeof window.claude.use==="function");
+const KEYLS="hb.anthropicKey.v1";
+const MODEL="claude-sonnet-5-5";
+function getKey(){try{return localStorage.getItem(KEYLS)||""}catch(e){return""}}
+function setKey(k){try{if(k)localStorage.setItem(KEYLS,k);else localStorage.removeItem(KEYLS);return true}catch(e){return false}}
+async function apiSample(prompt){
+  const key=getKey();
+  if(!key)throw{message:"Add your Anthropic API key in Board settings to use Claude features."};
+  let res;
+  try{
+    res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{
+      "content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:MODEL,max_tokens:4096,messages:[{role:"user",content:prompt}]})});
+  }catch(e){throw{message:"Couldn't reach Anthropic. Check your connection and try again."}}
+  let body=null;try{body=await res.json()}catch(e){}
+  if(!res.ok){
+    const msg=(body&&body.error&&body.error.message)||"";
+    if(res.status===401||res.status===403)throw{message:"Anthropic didn't accept that API key. Check it in Board settings."};
+    if(res.status===429)throw{code:"rate_limited",message:"Your API key has hit its rate limit. Wait a minute and try again."};
+    if(res.status===529||res.status>=500)throw{message:"Claude is overloaded right now. Try again in a minute."};
+    if(/credit|billing|balance/i.test(msg))throw{message:"Your Anthropic account is out of credit. Add credit in the Anthropic Console."};
+    throw{message:"Claude couldn't complete that request"+(msg?": "+msg:".")};
+  }
+  const text=((body&&body.content)||[]).filter(c=>c.type==="text").map(c=>c.text).join("");
+  return{text,truncated:body&&body.stop_reason==="max_tokens"};
+}
 function parseLoose(t){
   if(typeof t!=="string")return t;
   const a=t.indexOf("{"),b=t.lastIndexOf("}");
@@ -746,6 +773,7 @@ function render(){
   let acts="";
   if(ui.mode==="cluster")acts=claudeBtn("autoCluster","Auto-cluster","cluster");
   if(ui.mode==="connect")acts=claudeBtn("autoConnect","Auto-connect","connect");
+  if(!caps.sample&&!inClaude&&(ui.mode==="cluster"||ui.mode==="connect"||ui.mode==="story"))acts=`<button class="btn sm" type="button" data-act="openKey">Turn on Claude features</button>`;
   $("#hint").innerHTML=`<span>${HINTS[ui.mode]}</span><span class="acts">${acts}</span>`;
   document.body.classList.toggle("dragmode",ui.mode!=="story");
   const s=board.items.filter(i=>i.kind==="source").length;
@@ -908,6 +936,7 @@ function renderLayer(){
         ${COLS.map(c=>`<div class="two"><b>${c}</b><input type="text" aria-label="${c} label" data-bind="h.${c}.label" value="${esc(hz(c).label)}"><input type="text" aria-label="${c} period" data-bind="h.${c}.period" value="${esc(hz(c).period)}" placeholder="Period"></div>`).join("")}</div>
       <div class="grp"><b>Business stack (rows)</b>
         ${ROWS.map((r,ix)=>`<div class="two" style="grid-template-columns:44px minmax(0,1fr)"><b>L${ix+1}</b><input type="text" aria-label="Layer ${ix+1} name" data-bind="l.${r}.label" value="${esc(ly(r).label)}"></div>`).join("")}</div>
+      ${inClaude?"":keyGroup()}
       <div class="grp">
         ${board.isExample?`<p class="help" style="margin:0">This is the example board. Edits make your own copy.</p>`:ui.confirmDel?`<p class="help" style="margin:0">Delete “${esc(board.title)}” for good?</p><div class="row-actions" style="margin:0"><button class="btn danger" type="button" data-act="delBoard">Delete board</button><button class="btn ghost" type="button" data-act="cancelDel">Keep it</button></div>`:`<div><button class="btn ghost danger" type="button" data-act="askDel">Delete this board</button></div>`}
       </div>
@@ -926,6 +955,15 @@ function renderLayer(){
   $("#layer").innerHTML=h;
   if(f&&ui.naming){const n=$("#fname");if(n){n.focus();n.select()}ui.naming=false}
   if(p&&!ui.pop.focused){const n=$("#popName");if(n){n.focus()}ui.pop.focused=true}
+}
+function keyGroup(){
+  const k=getKey();
+  return `<div class="grp" id="keyGrp"><b>Claude features</b>
+    <p class="help" style="margin:0">Auto-cluster, Auto-connect, name suggestions and the written narrative use the Claude API. Add your own Anthropic API key to turn them on. It is kept in this browser only and sent only to Anthropic. Usage is billed to your Anthropic account.</p>
+    ${k?`<div class="row-actions" style="margin:0"><span class="help" style="margin:0;font-family:var(--mono)">Key saved: ${esc(k.slice(0,10))}…${esc(k.slice(-4))}</span><button class="btn sm ghost danger" type="button" data-act="removeKey">Remove key</button></div>`
+      :`<div style="display:flex;gap:6px"><label class="sr" for="apiKeyIn">Anthropic API key</label><input type="password" id="apiKeyIn" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"><button class="btn primary" type="button" data-act="saveKey">Save</button></div>
+      <p class="help" style="margin:0">Get a key from the <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic Console</a>.</p>`}
+  </div>`;
 }
 function closeLayer(){
   const wasFolder=ui.folder;
@@ -1067,6 +1105,14 @@ function importText(text){
 function closeMenu(){const m=$("#moreMenu");if(m)m.open=false}
 const A={
   undo,
+  openKey(){ui.settings=true;renderLayer();const k=$("#apiKeyIn")||$("#keyGrp");if(k){k.scrollIntoView({block:"center"});k.focus&&k.focus()}},
+  saveKey(){
+    const el=$("#apiKeyIn");const v=(el&&el.value||"").trim();
+    if(!/^sk-ant-/.test(v)){toast("That doesn't look like an Anthropic API key. It should start with sk-ant-.");return}
+    if(!setKey(v)){toast("This browser won't store the key. Check that site data isn't blocked.");return}
+    caps.sample=apiSample;render();toast("Claude features are on.");
+  },
+  removeKey(){setKey("");if(!inClaude)caps.sample=null;render();toast("API key removed from this browser.")},
   openSettings(){closeMenu();ui.settings=true;renderLayer();const t=$("#s-title");t&&t.focus()},
   newBoard(){closeMenu();board=blankBoard();hist=[];ui.sel=null;ui.compose=null;touch(true);location.hash="collect";render();ui.settings=true;renderLayer();const t=$("#s-title");t&&(t.focus(),t.select())},
   exportMd(){closeMenu();offer(slug()+".md",toMarkdown(),"Narrative as Markdown")},
@@ -1151,6 +1197,7 @@ document.addEventListener("keydown",e=>{
   if(e.key==="Enter"&&t.id==="cmp-text"){e.preventDefault();A.cadd();return}
   if(e.key==="Enter"&&(t.id==="fname"||t.id==="fsum"||t.id==="ed-text"||t.id==="ed-ref")){e.preventDefault();closeLayer();return}
   if(e.key==="Enter"&&t.id==="popName"){e.preventDefault();closePop();return}
+  if(e.key==="Enter"&&t.id==="apiKeyIn"){e.preventDefault();A.saveKey();return}
   if(e.key==="Escape"){
     if(drag){endDrag(e,true);return}
     if(ui.pop){closePop();return}
@@ -1181,7 +1228,7 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>drawThread
 const use=n=>(window.claude&&typeof window.claude.use==="function")?Promise.resolve(window.claude.use(n)).catch(()=>null):Promise.resolve(null);
 (async function init(){
   const [db,user,sample,downloads]=await Promise.all([use("db"),use("user"),use("sample"),use("downloads")]);
-  caps.db=db;caps.user=user;caps.sample=sample;caps.downloads=downloads;
+  caps.db=db;caps.user=user;caps.sample=sample||(!inClaude&&getKey()?apiSample:null);caps.downloads=downloads;
   if(db&&user){try{caps.uid=await user.id()}catch(e){caps.uid=null}}
   try{boards=await listBoards()}catch(e){caps.db=null;boards=await listBoards().catch(()=>[])}
   const latest=boards.slice().sort((a,b)=>b.updatedAt-a.updatedAt)[0];

@@ -25,7 +25,7 @@ Everything happens on the board itself:
 - **Connect**: drag the orange handle on a stack (it appears on hover) to another stack to start a thread. Drag from the last stack in a thread to extend it.
 - **Move**: drag a card or stack to empty space in another cell.
 
-A separate **Story** view shows the finished board with a written narrative, insights, and a check for structural gaps.
+A separate **Story** view shows the written narrative, insights, and a check for structural gaps.
 
 Board settings let you rename the horizons and layers. Every action can be undone.
 

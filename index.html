@@ -185,7 +185,7 @@ svg.live{position:fixed;inset:0;z-index:90;pointer-events:none;width:100vw;heigh
 .seq .step button:hover{color:var(--ink);background:var(--line)}
 
 /* Story */
-.narr{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:28px;margin-top:30px;align-items:start}
+.narr{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:28px;margin-top:8px;align-items:start}
 @media (max-width:900px){.narr{grid-template-columns:1fr}}
 .narr h2{font-size:22px;font-stretch:112%}
 .prose{font-family:var(--read);font-size:18px;line-height:1.55;max-width:65ch}
@@ -759,7 +759,7 @@ function draftFromStructure(){
 /* ---------- Rendering ---------- */
 const HINTS={
   board:`<span><b>+</b> add a card</span><span><b>Drag card onto card</b> to stack a theme</span><span><b>Drag the <i class="hd" aria-hidden="true"></i> handle</b> to another stack to thread</span><span><b>Select</b> to edit or open</span>`,
-  story:"<span><b>Story.</b> The finished blueprint and its narrative. Select a thread to focus it. Everything in the narrative is editable.</span>"
+  story:"<span><b>Story.</b> The narrative for this board. Everything here is editable; changes to the board show up when you regenerate it.</span>"
 };
 function claudeBtn(act,label,key){
   if(!caps.sample)return"";
@@ -776,7 +776,7 @@ function render(){
   const head=`${board.isExample?`<div class="notice">This is a worked example. Change anything and it becomes your own copy; the original stays in the board list.</div>`:""}
   <div class="bp-head"><div><span class="eyebrow">Horizon Blueprint</span><h1>${esc(board.title)}</h1>${board.purpose?`<p>${esc(board.purpose)}</p>`:`<p><button class="btn sm" type="button" data-act="openSettings">Add the question this board answers</button></p>`}</div>
     <div class="stats"><div><b>${board.items.length}</b>cards</div><div><b>${s}</b>sources</div><div><b>${board.themes.length}</b>themes</div><div><b>${board.threads.length}</b>threads</div></div></div>`;
-  $("#view").innerHTML=head+`<div class="board-scroll"><div class="board" id="board"><svg class="threads" aria-hidden="true"></svg>${boardHTML()}</div></div>`+threadBar()+(ui.mode==="story"?storyHTML():"");
+  $("#view").innerHTML=head+(ui.mode==="story"?storyHTML():`<div class="board-scroll"><div class="board" id="board"><svg class="threads" aria-hidden="true"></svg>${boardHTML()}</div></div>`+threadBar());
   requestAnimationFrame(drawThreads);
   renderLayer();updUndo();
   if(ui.compose){const t=$("#cmp-text");if(t&&document.activeElement!==t&&ui.compose.focus){t.focus();ui.compose.focus=false}}

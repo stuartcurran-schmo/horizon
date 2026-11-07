@@ -849,13 +849,13 @@ function storyHTML(){
     const e=evidence(th.themeIds);
     return `<div class="thread-narr" style="--tc:${threadColor(th)}"><h3><span class="badge">${ix+1}</span>${esc(th.name||"Unnamed thread")}</h3>
       <div class="path">${th.themeIds.map((id,k)=>{const t=themeById(id);return t?`${k?'<span class="ar">→</span>':""}<span class="pn">${t.col}</span>${esc(t.name)}`:""}).join(" ")}</div>
-      <div class="prose editable" contenteditable="plaintext-only" data-edit="thn.${th.id}" data-placeholder="Write the story of this thread, or generate it above.">${esc(th.narrative)}</div>
+      <div class="prose editable" contenteditable="plaintext-only" data-edit="thn.${th.id}" data-placeholder="Write the story of this thread, or use Auto-narrate.">${esc(th.narrative)}</div>
       <div class="ev${e.s===0?" thin":""}">${e.s} source${e.s===1?"":"s"} · ${e.t} topic${e.t===1?"":"s"}${e.s===0?" · ideas only":""}</div></div>`;
   }).join("");
   const g=gaps();
   return `<div class="narr">
     <div>
-      <div class="row-actions" style="justify-content:space-between"><h2>Narrative</h2><div class="row-actions" style="margin:0">${claudeBtn("writeNarrative",nar.overview?"Rewrite with Claude":"Write with Claude","narr")}<button class="btn sm" type="button" data-act="draft"${ui.busy?" disabled":""}>Draft from structure</button></div></div>
+      <div class="row-actions" style="justify-content:space-between"><h2>Narrative</h2><div class="row-actions" style="margin:0">${claudeBtn("writeNarrative","Auto-narrate","narr")}<button class="btn sm" type="button" data-act="draft"${ui.busy?" disabled":""}>Draft from structure</button></div></div>
       <div class="prose editable" contenteditable="plaintext-only" data-edit="overview" data-placeholder="An overview of where the most impact lies. Generate a draft, or write your own.">${esc(nar.overview)}</div>
       ${blocks}
     </div>
@@ -954,7 +954,7 @@ function renderLayer(){
 function keyGroup(){
   const k=getKey();
   return `<div class="grp" id="keyGrp"><b>Claude features</b>
-    <p class="help" style="margin:0">Auto-cluster, Auto-connect, name suggestions and the written narrative use the Claude API. Add your own Anthropic API key to turn them on. It is kept in this browser only and sent only to Anthropic. Usage is billed to your Anthropic account.</p>
+    <p class="help" style="margin:0">Auto-cluster, Auto-connect, Auto-narrate and name suggestions use the Claude API. Add your own Anthropic API key to turn them on. It is kept in this browser only and sent only to Anthropic. Usage is billed to your Anthropic account.</p>
     ${k?`<div class="row-actions" style="margin:0"><span class="help" style="margin:0;font-family:var(--mono)">Key saved: ${esc(k.slice(0,10))}…${esc(k.slice(-4))}</span><button class="btn sm ghost danger" type="button" data-act="removeKey">Remove key</button></div>`
       :`<div style="display:flex;gap:6px"><label class="sr" for="apiKeyIn">Anthropic API key</label><input type="password" id="apiKeyIn" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"><button class="btn primary" type="button" data-act="saveKey">Save</button></div>
       <p class="help" style="margin:0">Get a key from the <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic Console</a>.</p>`}

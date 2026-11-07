@@ -37,4 +37,4 @@ Run outside claude.ai, boards are saved in the browser's local storage. Use **Mo
 
 ## Claude features
 
-Auto-cluster, auto-connect, name suggestions and the written narrative use Claude. When the page runs as a Claude artifact they work with no setup. Anywhere else, open **Board settings** and add your own Anthropic API key (get one from the [Anthropic Console](https://console.anthropic.com/settings/keys)). The key is stored only in that browser and sent only to Anthropic, and usage is billed to your Anthropic account. Without a key, "Draft from structure" still writes a basic narrative from the board.
+Auto-cluster, Auto-connect, Auto-narrate and name suggestions use Claude. When the page runs as a Claude artifact they work with no setup. Anywhere else, open **Board settings** and add your own Anthropic API key (get one from the [Anthropic Console](https://console.anthropic.com/settings/keys)). The key is stored only in that browser and sent only to Anthropic, and usage is billed to your Anthropic account. Without a key, "Draft from structure" still writes a basic narrative from the board.
